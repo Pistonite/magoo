@@ -1,0 +1,14 @@
+version: '3'
+
+tasks:
+  check:
+    desc: Check for issues
+    cmds:
+    - cargo clippy --all-features --all-targets -- -D warnings -D clippy::todo
+    - cargo fmt --check
+
+  fix:
+    desc: Run formatter
+    cmds:
+    - cargo fmt --all
+

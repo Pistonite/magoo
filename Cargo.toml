@@ -1,0 +1,30 @@
+[package]
+name = "magoo"
+version = "0.0.0"
+edition = "2021"
+description = "A wrapper for git submodule that simplifies the workflows"
+repository = "https://github.com/Pistonite/magoo"
+license = "MIT"
+authors = ["Pistonight <terrabyte100k@gmail.com>"]
+keywords = ["git", "tool", "submodule"]
+categories = ["development-tools"]
+exclude = [
+    ".github/**/*",
+    "Taskfile.yml"
+]
+
+[dependencies]
+clap = { version = "4.4.8", features = ["derive"], optional = true }
+
+[features]
+default = ["cli"]
+cli = ["dep:clap"]
+
+[lib]
+name = "magoo"
+path = "src/lib.rs"
+
+[[bin]]
+name = "magoo"
+path = "src/main.rs"
+required-features = ["cli"]
