@@ -1,13 +1,13 @@
 [package]
 name = "magoo"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
-description = "A wrapper for git submodule that simplifies the workflows"
-repository = "https://github.com/Pistonite/magoo"
-license = "MIT"
-authors = ["Pistonight <terrabyte100k@gmail.com>"]
-keywords = ["git", "tool", "submodule"]
-categories = ["development-tools"]
+# description = "A wrapper for git submodule that simplifies the workflows"
+# repository = "https://github.com/Pistonite/magoo"
+# license = "MIT"
+# authors = ["Pistonight <terrabyte100k@gmail.com>"]
+# keywords = ["git", "tool", "submodule"]
+# categories = ["development-tools"]
 exclude = [
     ".github/**/*",
     "Taskfile.yml"
@@ -15,6 +15,11 @@ exclude = [
 
 [dependencies]
 clap = { version = "4.4.8", features = ["derive"], optional = true }
+pathdiff = "0.2.1"
+termcolor = "1.4.0"
+termsize = "0.1.6"
+thiserror = "1.0.50"
+which = "5.0.0"
 
 [features]
 default = ["cli"]

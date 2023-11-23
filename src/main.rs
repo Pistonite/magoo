@@ -1,3 +1,11 @@
+use clap::Parser;
+use magoo::Magoo;
+
 fn main() {
-    println!("Hello, world!");
+    let cli = Magoo::parse();
+    cli.set_print_options();
+    if let Err(e) = cli.run() {
+        eprintln!("magoo: fatal:");
+        eprintln!("  {e}");
+    }
 }
