@@ -1,2 +1,2 @@
-# magoo
-In development
+# ![magoo](./magoo.webp) magoo
+![magoo](./magoo.webp) In development

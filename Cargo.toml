@@ -2,9 +2,10 @@
 name = "magoo"
 version = "0.0.1"
 edition = "2021"
+description = "TODO"
 # description = "A wrapper for git submodule that simplifies the workflows"
 # repository = "https://github.com/Pistonite/magoo"
-# license = "MIT"
+license = "MIT"
 # authors = ["Pistonight <terrabyte100k@gmail.com>"]
 # keywords = ["git", "tool", "submodule"]
 # categories = ["development-tools"]
