@@ -6,9 +6,11 @@ tasks:
     cmds:
     - cargo clippy --all-features --all-targets -- -D warnings -D clippy::todo
     - cargo fmt --check
+    - txtpp verify README.md
 
   fix:
     desc: Run formatter
     cmds:
     - cargo fmt --all
+    - txtpp README.md
 

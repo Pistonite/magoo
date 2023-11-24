@@ -69,39 +69,20 @@
 //! ```
 //! You can also look at [main.rs](https://github.com/Pistonite/magoo/blob/master/src/main.rs) for
 //! reference.
-//! 
+//!
+
+use std::collections::{BTreeMap, BTreeSet};
 
 // mod error;
 mod git;
-use std::collections::BTreeMap;
-
+pub use git::SUPPORTED_GIT_VERSIONS;
 use git::{GitContext, GitError};
 
-// pub use git::SUPPORTED_GIT_VERSIONS;
 mod print;
+mod submodule;
+use submodule::Submodule;
 
-pub fn test() {
-    // print::println_info!("magoo: hello world");
-    // println!("---");
-    // print::println_warn!("magoo: hello world");
-    // print::print_warn!("magoo: hello world");
-    // println!("---");
-    // print::println_error!("magoo: hello world");
-    // print::print_error!("magoo: hello world");
-    // println!("---");
-    // print::println_dimmed!("magoo: hello world");
-    // print::print_dimmed!("magoo: hello world");
-    // println!("---");
-    // print::println_verbose!("magoo: hello world");
-    // println!("---");
-    // for i in 0..10 {
-    //     print::print_progress!("magoo: {}/{}", 10-i, 10);
-    //     std::thread::sleep(std::time::Duration::from_millis(1000));
-    // }
-    // print::progress_done();
-    // print::println_info!("done");
-    git::test();
-}
+use crate::submodule::FixResult;
 
 /// The main entry point for the library
 #[derive(Debug, Clone, PartialEq)]
@@ -195,12 +176,16 @@ impl Command {
     }
     pub fn run(&self, dir: &str) -> Result<(), GitError> {
         match self {
-            Command::Status(cmd) => cmd.run(dir),
+            Command::Status(cmd) => {
+                cmd.run(dir);
+            }
             _ => todo!(),
             // Command::Install(cmd) => cmd.run(dir),
             // Command::Update(cmd) => cmd.run(dir),
             // Command::Remove(cmd) => cmd.run(dir),
         }
+
+        Ok(())
     }
 }
 
@@ -235,14 +220,49 @@ impl StatusCommand {
     pub fn set_print_options(&self) {
         print::set_options(self.options.verbose, self.options.quiet, None);
     }
-    pub fn run(&self, dir: &str) -> Result<(), GitError> {
+    pub fn run(&self, dir: &str) -> Result<Vec<Submodule>, GitError> {
         let context = GitContext::try_from(dir)?;
         if self.git {
-            return context.print_version_info();
+            context.print_version_info()?;
+            return Ok(vec![]);
         }
 
+        let mut status_map = BTreeMap::new();
+        let mut index = Vec::new();
 
-        todo!()
+        context.get_submodule_status(&mut status_map, &mut index, self.all)?;
+        if self.fix {
+            let names = status_map.keys().cloned().collect::<Vec<_>>();
+            for name in names {
+                let submodule = status_map.get_mut(&name).unwrap();
+                if let FixResult::Dirty = submodule.make_module_consistent(&context)? {
+                    context.get_submodule_status(&mut status_map, &mut index, self.all)?;
+                }
+            }
+        }
+
+        let mut status = status_map.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
+        if self.all {
+            index.into_iter().for_each(|v| {
+                status.push(Submodule {
+                    in_gitmodules: None,
+                    in_config: None,
+                    in_index: Some(v),
+                    in_modules: None,
+                })
+            });
+        }
+
+        let dir_switch = if dir == "." {
+            "".to_string()
+        } else {
+            format!(" --dir {dir}")
+        };
+
+        for submodule in &status {
+            submodule.print(&context, &dir_switch)?;
+        }
+        Ok(status)
     }
 }
 
@@ -267,7 +287,6 @@ pub struct PrintOptions {
     /// `None` to read the color setting from git config.
     #[cfg_attr(feature = "cli", clap(skip))]
     pub color: Option<bool>,
-
 }
 
 impl PrintOptions {
