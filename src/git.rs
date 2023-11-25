@@ -204,6 +204,12 @@ impl GitContext {
 
 /// Wrapper implementation for git commands
 impl GitContext {
+    /// Run `git status` and print the status
+    pub fn status(&self) -> Result<(), GitError> {
+        self.run_git_command(&["status"], true)?;
+        Ok(())
+    }
+
     /// Run `git -C top_level ls-files ...`
     pub fn ls_files(&self, extra_args: &[&str]) -> Result<Vec<String>, GitError> {
         let top_level_dir = self.top_level_dir()?.display().to_string();
@@ -387,13 +393,59 @@ impl GitContext {
         Ok(())
     }
 
+    /// Runs `git submodule set-branch`. Path should be from top level
+    pub fn submodule_set_branch(&self, path: &str, branch: Option<&str>) -> Result<(), GitError> {
+        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let mut args = vec!["-C", &top_level_dir, "submodule", "set-branch"];
+        match branch {
+            Some(branch) => {
+                args.push("--branch");
+                args.push(branch);
+            }
+            None => {
+                args.push("--default");
+            }
+        }
+        args.push("--");
+        args.push(path);
+        self.run_git_command(&args, true)?;
+        Ok(())
+    }
+
+    /// Runs `git submodule set-url`. Path should be from top level
+    pub fn submodule_set_url(&self, path: &str, url: &str) -> Result<(), GitError> {
+        let top_level_dir = self.top_level_dir()?.display().to_string();
+        self.run_git_command(
+            &[
+                "-C",
+                &top_level_dir,
+                "submodule",
+                "set-url",
+                "--",
+                path,
+                url,
+            ],
+            true,
+        )?;
+        Ok(())
+    }
+
     /// Runs `git submodule update [-- <path>]`. Path should be from top level
-    pub fn submodule_update(&self, path: Option<&str>, force: bool) -> Result<(), GitError> {
+    pub fn submodule_update(
+        &self,
+        path: Option<&str>,
+        force: bool,
+        remote: bool,
+    ) -> Result<(), GitError> {
         let top_level_dir = self.top_level_dir()?.display().to_string();
         let mut args = vec!["-C", &top_level_dir, "submodule", "update"];
 
         if force {
             args.push("--force");
+        }
+
+        if remote {
+            args.push("--remote");
         }
 
         if let Some(path) = path {
@@ -523,7 +575,7 @@ pub enum GitError {
     LockFailed(String, std::io::Error),
 
     #[error("fix the issues above and try again.")]
-    NeedFix,
+    NeedFix(bool /* should show fatal */),
 }
 
 /// Helper trait to canonicalize a path and return a [`GitError`] if failed

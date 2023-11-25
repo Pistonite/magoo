@@ -78,8 +78,7 @@ It also deletes submodules that are deleted by others (by running `status --fix 
 
 ### Show submodule status
 ```bash
-magoo status [--all]
-magoo status --fix [--all]
+magoo status [--long] [--all] [--fix]
 ```
 Shows everything ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) knows about submodules in the current repo.
 
@@ -108,10 +107,10 @@ the `BRANCH` specified when you add it.
    ```
 
 ### Remove submodules
+![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) can remove a submodule with ease:
 ```bash
-magoo remove NAME [--force]
+magoo remove NAME
 ```
-`--force` will discard any changes made in the submodule (`git submodule deinit --force`)
 
 Note: Newer versions of git lets you delete a submodule with `git rm`. However, it doesn't delete the content in
 `.git/modules`. ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) deletes those.

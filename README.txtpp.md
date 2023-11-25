@@ -106,8 +106,7 @@ It also deletes submodules that are deleted by others (by running `status --fix 
 
 ### Show submodule status
 ```bash
-magoo status [--all]
-magoo status --fix [--all]
+magoo status [--long] [--all] [--fix]
 ```
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
@@ -142,10 +141,12 @@ the `BRANCH` specified when you add it.
    ```
 
 ### Remove submodules
+TXTPP#tag MAGOO
+TXTPP#include magoo.txt
+MAGOO can remove a submodule with ease:
 ```bash
-magoo remove NAME [--force]
+magoo remove NAME
 ```
-`--force` will discard any changes made in the submodule (`git submodule deinit --force`)
 
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt

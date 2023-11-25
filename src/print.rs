@@ -94,6 +94,16 @@ macro_rules! println_info {
 }
 pub(crate) use println_info;
 
+/// Print using info color
+macro_rules! print_info {
+    ($($args:tt)*) => {
+        if !$crate::print::is_quiet() {
+            print!($($args)*);
+        }
+    };
+}
+pub(crate) use print_info;
+
 /// Print using warning color
 macro_rules! println_warn {
     ($($args:tt)*) => {

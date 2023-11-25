@@ -25,6 +25,7 @@
 //!     git: true,
 //!     all: false,
 //!     fix: false,
+//!     long: false,
 //!     options: PrintOptions {
 //!         verbose: false,
 //!         quiet: false,
@@ -52,6 +53,7 @@
 //!         git: false,
 //!         all: true,
 //!         fix: false,
+//!         long: false,
 //!         options: PrintOptions {
 //!             verbose: true,
 //!             quiet: false,
@@ -68,16 +70,16 @@
 //! reference.
 //!
 
-mod git;
+pub mod git;
 pub use git::SUPPORTED_GIT_VERSIONS;
 use git::{GitContext, GitError};
 
-mod print;
-mod status;
-mod submodule;
+pub mod print;
+pub mod status;
+pub mod submodule;
 use status::Status;
 
-use crate::print::println_verbose;
+use crate::print::{println_error, println_hint, println_info, println_verbose, println_warn};
 
 /// The main entry point for the library
 #[derive(Debug, Clone, PartialEq)]
@@ -87,6 +89,7 @@ use crate::print::println_verbose;
     command(author, about, version, arg_required_else_help(true))
 )]
 pub struct Magoo {
+    /// Command to run
     #[clap(subcommand)]
     pub subcmd: Command,
     /// Set the working directory of commands. Useful if not running inside a git repository.
@@ -100,12 +103,13 @@ impl Magoo {
         self.subcmd.run(&self.dir)
     }
 
+    /// Apply the print options
     pub fn set_print_options(&self) {
         self.subcmd.set_print_options();
     }
 }
 
-/// The command to run
+/// Subcommands
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "cli", derive(clap::Parser))]
 pub enum Command {
@@ -126,15 +130,18 @@ pub enum Command {
 }
 
 impl Command {
+    /// Apply the print options
     pub fn set_print_options(&self) {
         match self {
             Command::Status(cmd) => cmd.set_print_options(),
             Command::Install(cmd) => cmd.set_print_options(),
+            Command::Update(cmd) => cmd.set_print_options(),
             _ => todo!(),
-            // Command::Update(cmd) => cmd.set_print_options(),
             // Command::Remove(cmd) => cmd.set_print_options(),
         }
     }
+
+    /// Run the command in the given directory.
     pub fn run(&self, dir: &str) -> Result<(), GitError> {
         match self {
             Command::Status(cmd) => {
@@ -143,8 +150,10 @@ impl Command {
             Command::Install(cmd) => {
                 cmd.run(dir)?;
             }
+            Command::Update(cmd) => {
+                cmd.run(dir)?;
+            }
             _ => todo!(),
-            // Command::Update(cmd) => cmd.run(dir),
             // Command::Remove(cmd) => cmd.run(dir),
         }
 
@@ -159,6 +168,10 @@ pub struct StatusCommand {
     /// Show the current git version and if it is supported
     #[cfg_attr(feature = "cli", clap(long))]
     pub git: bool,
+
+    /// Show more information in a longer format
+    #[cfg_attr(feature = "cli", clap(long, short))]
+    pub long: bool,
 
     /// Show every trace of submodules found.
     ///
@@ -179,14 +192,18 @@ pub struct StatusCommand {
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub fix: bool,
 
+    /// Print options
     #[cfg_attr(feature = "cli", clap(flatten))]
     pub options: PrintOptions,
 }
 
 impl StatusCommand {
+    /// Apply the print options
     pub fn set_print_options(&self) {
         self.options.apply();
     }
+
+    /// Run the command and return the status as a [`Status`] struct.
     pub fn run(&self, dir: &str) -> Result<Status, GitError> {
         let context = GitContext::try_from(dir)?;
         let _guard = context.lock()?;
@@ -217,42 +234,13 @@ impl StatusCommand {
         let all_switch = if self.all { " --all" } else { "" };
 
         for submodule in &flat_status {
-            submodule.print(&context, &dir_switch, all_switch)?;
+            submodule.print(&context, &dir_switch, all_switch, self.long)?;
         }
         Ok(status)
     }
 }
 
-/// Printing options for all commands
-#[derive(Debug, Default, Clone, PartialEq)]
-#[cfg_attr(feature = "cli", derive(clap::Parser))]
-pub struct PrintOptions {
-    /// Enable verbose output
-    ///
-    /// Display more information about what is happening, for example which git commands are
-    /// executed and their output
-    #[cfg_attr(feature = "cli", clap(long))]
-    pub verbose: bool,
-
-    /// Disable output to stdout
-    #[cfg_attr(feature = "cli", clap(long, short))]
-    pub quiet: bool,
-
-    /// Color options
-    ///
-    /// `Some(true)` and `Some(false)` to always/never use color in output.
-    /// `None` to read the color setting from git config.
-    #[cfg_attr(feature = "cli", clap(skip))]
-    pub color: Option<bool>,
-}
-
-impl PrintOptions {
-    pub fn apply(&self) {
-        print::set_options(self.verbose, self.quiet, self.color);
-    }
-}
-
-/// The `add` command
+/// The `install` command
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "cli", derive(clap::Parser))]
 pub struct InstallCommand {
@@ -296,14 +284,18 @@ pub struct InstallCommand {
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub force: bool,
 
+    /// Print options
     #[cfg_attr(feature = "cli", clap(flatten))]
     pub options: PrintOptions,
 }
 
 impl InstallCommand {
+    /// Apply the print options
     pub fn set_print_options(&self) {
         self.options.apply();
     }
+
+    /// Run the command in the given directory
     pub fn run(&self, dir: &str) -> Result<(), GitError> {
         let context = GitContext::try_from(dir)?;
         let _guard = context.lock()?;
@@ -329,7 +321,7 @@ impl InstallCommand {
                 println_verbose!("Installing submodules");
                 context.submodule_init(None)?;
                 context.submodule_sync(None)?;
-                context.submodule_update(None, self.force)?;
+                context.submodule_update(None, self.force, false)?;
             }
         }
 
@@ -351,10 +343,116 @@ pub struct UpdateCommand {
     #[cfg_attr(feature = "cli", arg(requires("name")))]
     pub branch: Option<String>,
 
+    /// Unset the update branch of the submodule
+    #[cfg_attr(feature = "cli", clap(long))]
+    #[cfg_attr(feature = "cli", arg(requires("name"), conflicts_with("branch")))]
+    pub unset_branch: bool,
+
     /// Change the url of the submodule
     #[cfg_attr(feature = "cli", clap(long, short))]
     #[cfg_attr(feature = "cli", arg(requires("name")))]
     pub url: Option<String>,
+
+    /// Whether to force the submodule to be updated
+    ///
+    /// This will pass the `--force` flag to `git submodule update`.
+    #[cfg_attr(feature = "cli", clap(long, short))]
+    pub force: bool,
+
+    /// Bypass warnings in the submodule state
+    #[cfg_attr(feature = "cli", clap(long))]
+    pub bypass: bool,
+
+    #[cfg_attr(feature = "cli", clap(flatten))]
+    pub options: PrintOptions,
+}
+
+impl UpdateCommand {
+    /// Apply the print options
+    pub fn set_print_options(&self) {
+        self.options.apply();
+    }
+
+    /// Run the command in the given directory
+    pub fn run(&self, dir: &str) -> Result<(), GitError> {
+        let context = GitContext::try_from(dir)?;
+        let _guard = context.lock()?;
+
+        match &self.name {
+            Some(name) => {
+                println_verbose!("Updating submodule: {name}");
+                let status = Status::read_from(&context, false)?;
+                let submodule = match status.modules.get(name) {
+                    Some(submodule) => submodule,
+                    None => {
+                        println_error!("Submodule `{name}` not found!");
+                        // maybe user passed in path instead of name?
+                        println_verbose!("Trying to search for a path matching `{name}`");
+                        for submodule in status.flattened() {
+                            if let Some(other_name) = submodule.name() {
+                                if let Some(path) = submodule.path() {
+                                    if path == name {
+                                        println_hint!("  however, there is a submodule \"{other_name}\" with path \"{path}\"");
+                                        println_hint!("  if you meant this submodule, use `magoo update {other_name}`");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        return Err(GitError::NeedFix(false));
+                    }
+                };
+                if !submodule.is_healthy(&context)? {
+                    if !self.bypass {
+                        println_error!("Submodule `{name}` is not healthy!");
+                        println_hint!("  run `magoo status` to investigate. Some issues might be fixable with `magoo status --fix`.");
+                        println_hint!("  alternatively, use the `--bypass` flag to ignore and continue anyway.");
+                        return Err(GitError::NeedFix(false));
+                    } else {
+                        println_warn!("Bypassing warnings from unhealthy submodule `{name}`");
+                    }
+                }
+
+                let path = match submodule.path() {
+                    Some(x) => x,
+                    None => {
+                        println_error!("Submodule `{name}` does not have a path!");
+                        println_hint!("  run `magoo status` to investigate.");
+                        println_hint!("  if you are unsure of the problem, try hard removing the submodule with `magoo remove {name} --force` and then re-adding it");
+                        return Err(GitError::NeedFix(false));
+                    }
+                };
+                context.submodule_init(Some(path))?;
+                if self.unset_branch {
+                    context.submodule_set_branch(path, None)?;
+                } else if let Some(branch) = &self.branch {
+                    context.submodule_set_branch(path, Some(branch))?;
+                }
+
+                if let Some(url) = &self.url {
+                    context.submodule_set_url(path, url)?;
+                }
+
+                context.submodule_sync(Some(path))?;
+                context.submodule_update(Some(path), self.force, true)?;
+            }
+            None => {
+                println_verbose!("Updating submodules");
+                context.submodule_init(None)?;
+                context.submodule_sync(None)?;
+                context.submodule_update(None, self.force, true)?;
+            }
+        }
+
+        println_info!();
+        println_info!("Submodules updated successfully.");
+        println_hint!(
+            "  run `git status` to check the changes and run `git add ...` to stage them"
+        );
+        println_hint!("  run `magoo status` to check the status of the submodules");
+        Ok(())
+    }
 }
 
 /// The `remove` command
@@ -369,4 +467,34 @@ pub struct RemoveCommand {
     /// The submodule will be removed even if it has local changes. (`git submodule deinit -f`)
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub force: bool,
+}
+
+/// Printing options for all commands
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "cli", derive(clap::Parser))]
+pub struct PrintOptions {
+    /// Enable verbose output
+    ///
+    /// Display more information about what is happening, for example which git commands are
+    /// executed and their output
+    #[cfg_attr(feature = "cli", clap(long))]
+    pub verbose: bool,
+
+    /// Disable output to stdout and stderr
+    #[cfg_attr(feature = "cli", clap(long, short))]
+    pub quiet: bool,
+
+    /// Color options
+    ///
+    /// `Some(true)` and `Some(false)` to always/never use color in output.
+    /// `None` to read the color setting from git config.
+    #[cfg_attr(feature = "cli", clap(skip))]
+    pub color: Option<bool>,
+}
+
+impl PrintOptions {
+    /// Apply the options
+    pub fn apply(&self) {
+        print::set_options(self.verbose, self.quiet, self.color);
+    }
 }

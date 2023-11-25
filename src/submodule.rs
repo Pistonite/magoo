@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError};
-use crate::print::{println_error, println_hint, println_info, println_verbose, println_warn};
+use crate::print::{
+    print_info, print_warn, println_error, println_hint, println_info, println_verbose,
+    println_warn,
+};
 
 /// Collection of data of a submodule with the same name as identifier
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -117,21 +120,33 @@ impl Submodule {
         context: &GitContext,
         dir_switch: &str,
         all_switch: &str,
+        long: bool,
     ) -> Result<(), GitError> {
         let name = match self.name() {
             Some(name) => format!("\"{name}\""),
             None => "<unknown>".to_string(),
         };
-        println_info!("submodule {name}:");
-        if let Some(url) = self.url() {
-            println_info!("  from {url}");
+
+        if long {
+            println_info!("submodule {name}:");
+            if let Some(url) = self.url() {
+                println_info!("  from {url}");
+            }
+            if let Some(branch) = self.branch() {
+                println_info!("  update branch is {branch}");
+            }
+        } else {
+            print_info!("{name:<15}");
         }
-        if let Some(branch) = self.branch() {
-            println_info!("  update branch is {branch}");
-        }
+
         let path = self.path();
         if let Some(index_commit) = self.index_commit() {
             let index_commit_short = &index_commit[..7];
+            if long {
+                print_info!("  {index_commit_short}");
+            } else {
+                print_info!(" at {index_commit_short}");
+            }
             match path {
                 Some(path) => {
                     let describe = {
@@ -144,19 +159,18 @@ impl Submodule {
                         x
                     };
 
-                    match describe {
-                        Some(describe) => {
-                            println_info!("  {index_commit_short} \"{path}\" ({describe})");
-                        }
-                        None => {
-                            println_info!("  {index_commit_short} \"{path}\"");
-                        }
+                    print_info!(" \"{path}\"");
+                    if let Some(describe) = describe {
+                        print_info!(" ({describe})");
                     }
                 }
                 None => {
-                    println_info!("  {index_commit_short} <unknown path>");
+                    print_warn!("<unknown path>");
                 }
             };
+            if long {
+                println_info!();
+            }
         }
         if let Some(head_commit) = self.head_commit() {
             if let Some(index_commit) = self.index_commit() {
@@ -172,35 +186,50 @@ impl Submodule {
                             }
                         }
                     }
-                    println_warn!("! checked out {head_commit_short}{describe}");
-                    println_hint!(
-                        "    run `magoo{dir_switch} install` to revert all submodules to index"
-                    );
-                    if let Some(path) = path {
-                        let path = quote_arg(path);
-                        let git_c = match context.get_top_level_switch()? {
-                            Some(x) => format!("git -C {x}"),
-                            None => "git".to_string(),
-                        };
+                    if long {
+                        println_warn!("! checked out {head_commit_short}{describe}");
+                        if let Some(path) = path {
+                            let path = quote_arg(path);
+                            let git_c = match context.get_top_level_switch()? {
+                                Some(x) => format!("git -C {x}"),
+                                None => "git".to_string(),
+                            };
 
-                        println_hint!("    run `{git_c} submodule update --init -- {path}` to revert this submodule to index");
-                        println_hint!("    run `{git_c} add {path}` update the index to {head_commit_short}{describe}");
+                            println_hint!("    run `{git_c} submodule update -- {path}` to revert this submodule to index (`magoo{dir_switch} install` to revert all)");
+                            println_hint!("    run `{git_c} add {path}` update the index to {head_commit_short}{describe}");
+                        } else {
+                            println_hint!(
+                            "    run `magoo{dir_switch} install` to revert all submodules to index"
+                        );
+                        }
+                    } else {
+                        print_warn!(", checked out {head_commit_short}{describe}");
                     }
                 }
             }
         } else {
             // not initialized
             if let Some(path) = path {
-                println_warn!("! not initialized");
-                let path = quote_arg(path);
-                let git_c = match context.get_top_level_switch()? {
-                    Some(x) => format!("git -C {x}"),
-                    None => "git".to_string(),
-                };
+                if long {
+                    println_warn!("! not initialized");
+                    let path = quote_arg(path);
+                    let git_c = match context.get_top_level_switch()? {
+                        Some(x) => format!("git -C {x}"),
+                        None => "git".to_string(),
+                    };
 
-                println_hint!("    run `magoo{dir_switch} install` to initialize all submodules");
-                println_hint!("    run `{git_c} submodule update --init -- {path}` to initialize only this submodule");
+                    println_hint!(
+                        "    run `magoo{dir_switch} install` to initialize all submodules"
+                    );
+                    println_hint!("    run `{git_c} submodule update --init -- {path}` to initialize only this submodule");
+                } else {
+                    print_warn!(", not initialized");
+                }
             }
+        }
+
+        if !long {
+            println_info!();
         }
 
         if !self.is_module_consistent(context)? {
@@ -222,7 +251,10 @@ impl Submodule {
                 "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
             );
         }
-        println_info!();
+
+        if long {
+            println_info!();
+        }
 
         Ok(())
     }
