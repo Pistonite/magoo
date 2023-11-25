@@ -1,6 +1,11 @@
 # ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) magoo
 
-**In Development. commands left are: status (--fix), install, update, remove**
+![Build Badge](https://img.shields.io/github/actions/workflow/status/Pistonite/magoo/rust.yml)
+![Version Badge](https://img.shields.io/crates/v/magoo)
+![License Badge](https://img.shields.io/github/license/Pistonite/magoo)
+![Issue Badge](https://img.shields.io/github/issues/Pistonite/magoo)
+
+**In Development. commands left are: install, update, remove**
 
 This ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) is Magoo, he helps you manage git submodules with ease, like `npm` or `cargo`, but for submodules.
 

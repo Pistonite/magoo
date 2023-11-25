@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError, PrintMode};
 use crate::print::{println_dimmed, println_info, println_verbose, println_warn};
@@ -124,7 +124,12 @@ impl Submodule {
         self.head_commit().map(|s| &s[..7])
     }
 
-    pub fn print(&self, context: &GitContext, dir_switch: &str) -> Result<(), GitError> {
+    pub fn print(
+        &self,
+        context: &GitContext,
+        dir_switch: &str,
+        all_switch: &str,
+    ) -> Result<(), GitError> {
         let name = match self.name() {
             Some(name) => format!("\"{name}\""),
             None => "<unknown>".to_string(),
@@ -197,84 +202,305 @@ impl Submodule {
             }
         } else {
             // not initialized
+            if let Some(path) = path {
+                println_warn!("! not initialized");
+                let path = quote_arg(path);
+                let git_c = match context.get_top_level_switch()? {
+                    Some(x) => format!("git -C {x}"),
+                    None => "git".to_string(),
+                };
+
+                println_dimmed!("    run `magoo{dir_switch} install` initialize all submodules");
+                println_dimmed!("    run `{git_c} submodule update --init -- {path}` to initialize only this submodule");
+            }
+        }
+
+        if !self.is_module_consistent(context)? {
+            println_warn!("! submodule has residue");
+            println_dimmed!(
+                "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
+            );
+        }
+        if !self.resolved_paths(context)?.is_consistent() {
+            println_warn!("! inconsistent paths");
+            println_dimmed!(
+                "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
+            );
+        }
+        let issue = self.find_issue();
+        if issue != PartsIssue::None {
+            println_warn!("! inconsistent state ({})", issue.describe());
+            println_dimmed!(
+                "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
+            );
         }
         println_info!();
 
         Ok(())
     }
 
-    /// Get if the module data and the submodule's worktree is consistent
-    ///
-    /// Checks that:
-    /// - if `worktree` is set, `head_sha` and `git_dir` should also be set
-    /// - `git_dir` should resolve to `.git/modules/<name>`
-    ///
-    /// If `self.in_module` is None, this function returns [`true`] vacuously.
+    /// Return false if the submodule has issues that can be fixed with [`fix`]
+    pub fn is_healty(&self, context: &GitContext) -> Result<bool, GitError> {
+        if !self.is_module_consistent(context)? {
+            return Ok(false);
+        }
+        if !self.resolved_paths(context)?.is_consistent() {
+            return Ok(false);
+        }
+        if self.find_issue() != PartsIssue::None {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    /// Get if the module data and the submodule's worktree is consistent, see [`InGitModule::is_consistent`]
     pub fn is_module_consistent(&self, context: &GitContext) -> Result<bool, GitError> {
         let in_module = match &self.in_modules {
             Some(in_module) => in_module,
             None => return Ok(true),
         };
 
-        if let Some(worktree) = &in_module.worktree {
-            let consistent = in_module.head_sha.is_some() && in_module.git_dir.is_some();
-            if !consistent {
-                return Ok(false);
-            }
-        }
-
-        Ok(in_module.is_git_dir_consistent(context)?)
+        Ok(in_module.is_consistent(context)?)
     }
 
-    /// Fix inconsistencies with the module data stored in .git/modules/<name>
-    ///
-    /// Checks that:
-    /// - if `worktree` is set and `head_sha` and `git_dir` are both not set, delete
-    /// `core.worktree` in `.git/modules/<name>/config`
-    /// - if `git_dir` does not resolve to `.git/modules/<name>`, run `git submodule absorbgitdirs`
-    pub fn make_module_consistent(&mut self, context: &GitContext) -> Result<FixResult, GitError> {
-        let in_module = match &mut self.in_modules {
-            Some(in_module) => in_module,
-            None => return Ok(FixResult::Clean),
-        };
-
-        let mut result = FixResult::Clean;
-
-        if let Some(worktree) = &in_module.worktree {
-            let has_head_sha = in_module.head_sha.is_some();
-            let has_git_dir = in_module.git_dir.is_some();
-            match (has_head_sha, has_git_dir) {
-                (true, true) => {}
-                (false, false) => {
-                    // fix
-                    let config_path = context
-                        .top_level_dir()?
-                        .join(".git/modules")
-                        .join(&in_module.name)
-                        .join("config");
-                    println_warn!(
-                        "! Fixing: deleting core.worktree in `{}`",
-                        config_path.display()
-                    );
-                    context.unset_config(&config_path, "core.worktree")?;
-                    in_module.worktree = None;
-                }
-                _ => {
-                    println_verbose!(
-                        "Cannot auto fix module inconsistency! One of head_sha and git_dir is set."
-                    );
+    /// Resolves the paths stored in various places and return them
+    pub fn resolved_paths(&self, context: &GitContext) -> Result<SubmodulePaths, GitError> {
+        let mut path_in_gitmodules = None;
+        if let Some(in_gitmodules) = &self.in_gitmodules {
+            if let Some(path) = &in_gitmodules.path {
+                let top_level_dir = context.top_level_dir()?;
+                if let Ok(path) = top_level_dir.join(path).canonicalize() {
+                    path_in_gitmodules = Some(path);
                 }
             }
         }
 
-        if !in_module.is_git_dir_consistent(context)? {
-            // fix
-            println_warn!("! Fixing: running `git submodule absorbgitdirs`");
-            context.run_git_command(&["submodule", "absorbgitdirs"], PrintMode::Quiet)?;
-            result = FixResult::Dirty;
+        let mut path_in_index = None;
+        if let Some(in_index) = &self.in_index {
+            let top_level_dir = context.top_level_dir()?;
+            if let Ok(path) = top_level_dir.join(&in_index.path).canonicalize() {
+                path_in_index = Some(path);
+            }
         }
 
-        Ok(result)
+        let mut path_in_module = None;
+        if let Some(in_module) = &self.in_modules {
+            if let Some(worktree) = &in_module.worktree {
+                let git_dir = context.git_dir()?;
+                if let Ok(path) = git_dir
+                    .join("modules")
+                    .join(&in_module.name)
+                    .join(worktree)
+                    .canonicalize()
+                {
+                    path_in_module = Some(path);
+                }
+            }
+        }
+
+        Ok(SubmodulePaths {
+            in_gitmodules: path_in_gitmodules,
+            in_index: path_in_index,
+            in_modules: path_in_module,
+        })
+    }
+
+    /// Fix the submodule
+    ///
+    /// This will result in one of the following states:
+    /// 1. The submodule is healthy and initialized.
+    /// 2. The submodule is healthy but not initialized.
+    /// 3. The submodule is deleted.
+    pub fn fix(&mut self, context: &GitContext) -> Result<(), GitError> {
+        // the submodule can be in any shape or form
+        // here are some notations:
+        // - `G`: submodule data in .gitmodules is [`Some`]
+        // - `C`: submodule data in .git/config is [`Some`]
+        // - `M`: submodule data in .git/modules/<name> is [`Some`]
+        // - `I`: submodule data in the index is [`Some`]
+
+        // First, we want to be in a state where, if a component exists, it is consistent internally and with others
+        if !self.is_module_consistent(context)? {
+            self.force_remove_module_dir(context)?;
+        }
+
+        // make sure all paths are consistent
+        // The paths are in G, M and I
+        let resolved_paths = self.resolved_paths(context)?;
+        if !resolved_paths.is_consistent() {
+            // we only fix the paths if index exists
+            // if index doesn't exist, the submodule will be deleted anyway
+            if let Some(in_index) = &self.in_index {
+                let index_path = in_index.path.clone();
+                // path exists in index
+                if self.in_modules.is_some() {
+                    if resolved_paths.in_index != resolved_paths.in_modules {
+                        // module has different path, delete it
+                        self.force_remove_module_dir(context)?;
+                    }
+                }
+                if let Some(in_gitmodules) = &self.in_gitmodules {
+                    if resolved_paths.in_index != resolved_paths.in_gitmodules {
+                        let name = &in_gitmodules.name;
+                        // gitmodules has different path, update it
+                        let top_level_dir = context.top_level_dir()?;
+                        context.set_config(
+                            top_level_dir.join(".gitmodules"),
+                            &format!("submodule.\"{name}\".path"),
+                            Some(&index_path),
+                        )?;
+                    }
+                }
+            }
+        }
+
+        self.fix_issue(self.find_issue(), context)?;
+        Ok(())
+    }
+
+    fn fix_issue(&mut self, issue: PartsIssue, context: &GitContext) -> Result<(), GitError> {
+        match issue {
+            PartsIssue::None => {
+                // submodule is healthy
+            }
+            PartsIssue::Residue => {
+                // submodule is not initialized but module dir exists
+                println_verbose!("Fix: removing uninitialized submodule directory and worktree");
+                self.force_remove_config(context)?;
+                self.force_remove_module_dir(context)?;
+            }
+            PartsIssue::MissingIndex => {
+                // index is missing, delete it
+                println_verbose!("Fix: deleting submodule missing in index");
+                self.force_delete(context)?;
+            }
+            PartsIssue::MissingInGitModules => {
+                // submodule is not in .gitmodules
+                // delete it
+                println_verbose!("Fix: deleting submodule missing in .gitmodules");
+                self.force_delete(context)?;
+            }
+        };
+        Ok(())
+    }
+
+    fn find_issue(&self) -> PartsIssue {
+        match (
+            &self.in_gitmodules,
+            &self.in_config,
+            &self.in_modules,
+            &self.in_index,
+        ) {
+            (None, None, None, None) => {
+                // submodule doesn't exist
+                PartsIssue::None
+            }
+            (Some(_), Some(_), Some(_), Some(_)) => {
+                // initialized and all good
+                PartsIssue::None
+            }
+            (Some(_), None, None, Some(_)) => {
+                // submodule is in .gitmodules and index (not initialized)
+                // nothing to fix
+                PartsIssue::None
+            }
+            (Some(_), Some(_), None, Some(_)) => {
+                // there are remains after submodule is deinitialized
+                PartsIssue::Residue
+            }
+            (Some(_), None, Some(_), Some(_)) => PartsIssue::Residue,
+            (_, _, _, None) => {
+                // index is missing
+                PartsIssue::MissingIndex
+            }
+            (None, _, _, _) => {
+                // submodule is not in .gitmodules
+                PartsIssue::MissingInGitModules
+            }
+        }
+    }
+
+    /// Deinitialize the submodule by removing the worktree and the git dir, and in .git/config
+    pub fn deinit(&mut self, context: &GitContext) -> Result<(), GitError> {
+        let path = match &self.in_index {
+            None => {
+                return Err(GitError::InvalidIndex(
+                    "submodule can only be deinitialized if it is in the index".to_string(),
+                ));
+            }
+            Some(index) => &index.path,
+        };
+        context.submodule_deinit(Some(path))?;
+        self.force_remove_module_dir(context)
+    }
+
+    /// Delete the submodule by removing the configuration and directories that reference it
+    pub fn force_delete(&mut self, context: &GitContext) -> Result<(), GitError> {
+        self.force_remove_from_index(context)?;
+        self.force_remove_module_dir(context)?;
+        self.force_remove_config(context)?;
+
+        if let Some(in_gitmodules) = &self.in_gitmodules {
+            let top_level_dir = context.top_level_dir()?;
+            let name = &in_gitmodules.name;
+            println_info!("Deleting submodule `{name}` in .gitmodules");
+            let _ = context.remove_config_section(
+                top_level_dir.join(".gitmodules"),
+                &format!("submodule.{name}"),
+            );
+        }
+        self.in_gitmodules = None;
+
+        Ok(())
+    }
+
+    pub fn force_remove_from_index(&mut self, context: &GitContext) -> Result<(), GitError> {
+        if let Some(in_index) = &self.in_index {
+            println_info!("Deleting `{}` in index", in_index.path);
+            let _ = context.remove_from_index(&in_index.path)?;
+        }
+        self.in_index = None;
+        Ok(())
+    }
+
+    /// Delete the submodule in .git/modules/<name> and its worktree if present
+    pub fn force_remove_module_dir(&mut self, context: &GitContext) -> Result<(), GitError> {
+        if let Some(in_module) = &self.in_modules {
+            let name = &in_module.name;
+            let git_dir = context.git_dir()?;
+            let module_dir = git_dir.join("modules").join(name);
+            if module_dir.exists() {
+                // delete worktree directory if exists
+                if let Some(worktree) = &in_module.worktree {
+                    let worktree_path = module_dir.join(worktree);
+                    if worktree_path.exists() {
+                        println_info!(
+                            "Deleting the worktree of submodule `{name}` at `{}`",
+                            worktree_path.display().to_string()
+                        );
+                        let _ = std::fs::remove_dir_all(worktree_path);
+                    }
+                }
+                // delete the module directory
+                println_info!("Deleting `.git/modules/{name}`");
+                let _ = std::fs::remove_dir_all(module_dir);
+            }
+        }
+        self.in_modules = None;
+        Ok(())
+    }
+
+    /// Delete the submodule in .git/config
+    pub fn force_remove_config(&mut self, context: &GitContext) -> Result<(), GitError> {
+        if let Some(in_config) = &self.in_config {
+            let git_dir = context.git_dir()?;
+            let name = &in_config.name;
+            println_info!("Deleting submodule `{name}` in .git/config");
+            let _ =
+                context.remove_config_section(git_dir.join("config"), &format!("submodule.{name}"));
+        }
+        self.in_config = None;
+        Ok(())
     }
 }
 
@@ -344,16 +570,21 @@ pub struct InGitModule {
 }
 
 impl InGitModule {
-    /// Return if `self.git_dir` resolves to `.git/modules/<name>`
+    /// Return if data is consistent internally
     ///
-    /// Returns `true` if it's None
-    pub fn is_git_dir_consistent(&self, context: &GitContext) -> Result<bool, GitError> {
+    /// For the data to be consistent:
+    /// - if `worktree` is set, `head_sha` and `git_dir` should also be set
+    /// - `git_dir` should resolve to `.git/modules/<name>`
+    pub fn is_consistent(&self, context: &GitContext) -> Result<bool, GitError> {
+        if self.worktree.is_some() {
+            let consistent = self.head_sha.is_some() && self.git_dir.is_some();
+            if !consistent {
+                return Ok(false);
+            }
+        }
         if let Some(git_dir) = &self.git_dir {
             let git_dir = Path::new(git_dir).canonicalize_git()?;
-            let expected_git_dir = context
-                .top_level_dir()?
-                .join(".git/modules")
-                .join(&self.name);
+            let expected_git_dir = context.git_dir()?.join("modules").join(&self.name);
             if git_dir != expected_git_dir {
                 return Ok(false);
             }
@@ -363,34 +594,39 @@ impl InGitModule {
     }
 }
 
-// /A submodule issue that can be fixed with `status --fix`
-// ///
-// /## Notation
-// /Some issues are only possible with certain patterns of submodule data.
-// /We have the following notation:
-// /- `G`: submodule data in .gitmodules is [`Some`]
-// /- `C`: submodule data in .git/config is [`Some`]
-// /- `M`: submodule data in .git/modules/<name> is [`Some`]
-// /- `I`: submodule data in the index is [`Some`]
-// ///
-// /Also:
-// /- `I.path` is the path in the index
-// /- `G.path` is the path in .gitmodules
-// /- `M.path` is the path in .git/modules/<name>/config
-// ///
-// /Each variant has a list of these letters, which are the scenarios the issue corresponds to
-
 /// An issue in the paths in different places
 pub struct SubmodulePaths {
-    pub in_gitmodules: Option<String>,
-    pub in_index: String,
-    pub in_modules: Option<String>,
+    pub in_gitmodules: Option<PathBuf>,
+    pub in_index: Option<PathBuf>,
+    pub in_modules: Option<PathBuf>,
 }
 
-/// Result of fixing some issues in the submodule
-pub enum FixResult {
-    /// No refresh needed after the fix
-    Clean,
-    /// The issue was fixed, but the data could be dirty and requires the status to be refreshed
-    Dirty,
+impl SubmodulePaths {
+    pub fn is_consistent(&self) -> bool {
+        if self.in_gitmodules == self.in_index && self.in_index == self.in_modules {
+            return true;
+        }
+        if self.in_gitmodules == self.in_index && self.in_modules.is_none() {
+            return true;
+        }
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum PartsIssue {
+    None,
+    Residue,
+    MissingIndex,
+    MissingInGitModules,
+}
+impl PartsIssue {
+    pub fn describe(&self) -> &'static str {
+        match self {
+            PartsIssue::None => "none",
+            PartsIssue::Residue => "eesidue",
+            PartsIssue::MissingIndex => "index missing",
+            PartsIssue::MissingInGitModules => "not in .gitmodules",
+        }
+    }
 }

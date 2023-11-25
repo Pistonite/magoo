@@ -38,6 +38,9 @@ pub enum GitError {
 
     #[error("cannot find module `{0}`")]
     ModuleNotFound(String),
+
+    #[error("cannot lock `{0}`: {1}")]
+    LockFailed(String, std::io::Error),
 }
 
 /// Helper trait to canonicalize a path and return a [`GitError`] if failed

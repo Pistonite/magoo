@@ -2,7 +2,12 @@ TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 # MAGOO magoo
 
-**In Development. commands left are: status (--fix), install, update, remove**
+![Build Badge](https://img.shields.io/github/actions/workflow/status/Pistonite/magoo/rust.yml)
+![Version Badge](https://img.shields.io/crates/v/magoo)
+![License Badge](https://img.shields.io/github/license/Pistonite/magoo)
+![Issue Badge](https://img.shields.io/github/issues/Pistonite/magoo)
+
+**In Development. commands left are: install, update, remove**
 
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt

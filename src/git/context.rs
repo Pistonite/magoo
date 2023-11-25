@@ -1,10 +1,14 @@
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
+use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
+use std::time::Duration;
 
-use crate::print::{self, print_progress, println_info, println_verbose};
+use fs4::FileExt;
+
+use crate::print::{self, print_progress, println_info, println_verbose, println_warn};
 use crate::submodule::{InGitConfig, InGitModule, InGitmodules, IndexObject, Submodule};
 
 use super::{quote_arg, GitCanonicalize, GitError};
@@ -42,15 +46,21 @@ impl GitContext {
             top_level_cell: OnceCell::new(),
         })
     }
-}
 
-impl GitContext {
+    /// Return a guard that locks the repository until dropped. Other magoo processes cannot access
+    /// the repository while the guard is alive.
+    pub fn lock(&self) -> Result<Guard, GitError> {
+        let git_dir = self.git_dir()?;
+        let lock_path = git_dir.join("magoo.lock");
+        Guard::new(lock_path)
+    }
+
     pub fn print_version_info(&self) -> Result<(), GitError> {
         println_info!(
             "The officially supported git versions are: {}",
             super::SUPPORTED_GIT_VERSIONS
         );
-        println_info!("You `git --version` is:");
+        println_info!("Your `git --version` is:");
         self.run_git_command(&["--version"], PrintMode::Normal)?;
         Ok(())
     }
@@ -261,8 +271,11 @@ impl GitContext {
     ///
     /// Returns a map of path to submodule [`IndexObject`].
     pub fn read_submodules_in_index(&self) -> Result<BTreeMap<String, IndexObject>, GitError> {
+        let top_level_dir = self.top_level_dir()?;
         let output = self.run_git_command(
             &[
+                "-C",
+                &top_level_dir.display().to_string(),
                 "ls-files",
                 r#"--format=%(objectmode) %(objectname) %(path)"#,
             ],
@@ -500,15 +513,90 @@ impl GitContext {
         Ok(name_values)
     }
 
-    pub fn unset_config<S>(&self, config_path: S, key: &str) -> Result<(), GitError>
+    /// Set or remove a config from a config file. The config path is resolved relative to
+    /// the working directory of this context.
+    pub fn set_config<S>(
+        &self,
+        config_path: S,
+        key: &str,
+        value: Option<&str>,
+    ) -> Result<(), GitError>
+    where
+        S: AsRef<Path>,
+    {
+        let config_path = config_path.as_ref().display().to_string();
+        match value {
+            Some(v) => {
+                self.run_git_command(&["config", "-f", &config_path, key, v], PrintMode::Quiet)?;
+            }
+            None => {
+                self.run_git_command(
+                    &["config", "-f", &config_path, "--unset", key],
+                    PrintMode::Quiet,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Remove a config section from a config file. The config path is resolved relative to
+    /// the working directory of this context.
+    pub fn remove_config_section<S>(&self, config_path: S, section: &str) -> Result<(), GitError>
     where
         S: AsRef<Path>,
     {
         let config_path = config_path.as_ref().display().to_string();
         self.run_git_command(
-            &["config", "-f", &config_path, "--unset", key],
-            PrintMode::Normal,
+            &["config", "-f", &config_path, "--remove-section", section],
+            PrintMode::Quiet,
         )?;
+        Ok(())
+    }
+
+    /// Remove an object from the index and stage the change. The path should be relative from repo top level
+    pub fn remove_from_index(&self, path: &str) -> Result<(), GitError> {
+        let top_level_dir = self.top_level_dir()?;
+
+        self.run_git_command(
+            &["-C", &top_level_dir.display().to_string(), "rm", path],
+            PrintMode::Quiet,
+        )?;
+        self.run_git_command(
+            &["-C", &top_level_dir.display().to_string(), "add", path],
+            PrintMode::Quiet,
+        )?;
+        Ok(())
+    }
+
+    /// Runs `git submodule deinit [-- <path>]`
+    pub fn submodule_deinit(&self, path: Option<&str>) -> Result<(), GitError> {
+        let top_level_dir = self.top_level_dir()?;
+        match path {
+            Some(path) => {
+                self.run_git_command(
+                    &[
+                        "-C",
+                        &top_level_dir.display().to_string(),
+                        "submodule",
+                        "deinit",
+                        "--",
+                        path,
+                    ],
+                    PrintMode::Normal,
+                )?;
+            }
+            None => {
+                self.run_git_command(
+                    &[
+                        "-C",
+                        &top_level_dir.display().to_string(),
+                        "submodule",
+                        "deinit",
+                    ],
+                    PrintMode::Normal,
+                )?;
+            }
+        }
         Ok(())
     }
 
@@ -619,4 +707,49 @@ pub enum PrintMode {
     Progress,
     /// Print git output as normal
     Normal,
+}
+
+/// Guard that uses file locking to ensure only one process are manipulating
+/// the submodules at a time.
+pub struct Guard(pub File, pub PathBuf);
+
+impl Guard {
+    /// Create a new guard with the given path as the file lock. Will block until
+    /// the lock can be acquired.
+    pub fn new<P>(path: P) -> Result<Self, GitError>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        if path.exists() {
+            println_warn!("Waiting on file lock. If you are sure no other magoo processes are running, you can remove the lock file `{}`", path.display());
+        }
+        while path.exists() {
+            println_verbose!("Waiting for lock file...");
+            std::thread::sleep(Duration::from_millis(1000));
+        }
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)
+            .map_err(|e| GitError::LockFailed(path.display().to_string(), e))?;
+        file.lock_exclusive()
+            .map_err(|e| GitError::LockFailed(path.display().to_string(), e))?;
+        println_verbose!("Acquired lock file `{}`", path.display());
+        Ok(Self(file, path.to_path_buf()))
+    }
+}
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        let path = &self.1.display();
+        println_verbose!("Releasing lock file `{path}`");
+        if self.0.unlock().is_err() {
+            println_verbose!("Failed to unlock file `{path}`");
+        }
+        if std::fs::remove_file(&self.1).is_err() {
+            println_verbose!("Failed to remove file `{path}`");
+        }
+    }
 }

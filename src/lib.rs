@@ -64,7 +64,7 @@
 //!     });
 //!
 //!     magoo.set_print_options();
-//!     magoo.run.unwrap();
+//!     magoo.run().unwrap();
 //! }
 //! ```
 //! You can also look at [main.rs](https://github.com/Pistonite/magoo/blob/master/src/main.rs) for
@@ -81,8 +81,6 @@ use git::{GitContext, GitError};
 mod print;
 mod submodule;
 use submodule::Submodule;
-
-use crate::submodule::FixResult;
 
 /// The main entry point for the library
 #[derive(Debug, Clone, PartialEq)]
@@ -110,45 +108,11 @@ impl Magoo {
     }
 }
 
-// /// Run the `git` subcommand and return the current git version.
-// ///
-// /// If git is not found or the version is not supported, an error is returned.
-// pub fn run_git(options: &Options) -> Result<String, error::MagooError> {
-//     set_log_level(options);
-//     let git = git::Git::new(options);
-//     git.check_version()
-// }
-//
-// pub struct SubmoduleStatus {
-//     pub path: String,
-//     pub commit: String,
-//     pub status: char,
-//     pub reference: Option<String>,
-// }
-//
-// /// Run the `status` subcommand and return the status of all submodules.
-// ///
-// /// The key of the returned map is the name of the submodule.
-// pub fn run_status(options: &Options) -> Result<BTreeMap<String, SubmoduleStatus>, error::MagooError> {
-//     set_log_level(options);
-//     let git = git::Git::new(options);
-//     git.submodule_status()
-// }
-//
-// fn set_log_level(options: &Options) {
-//         log::LOG_LEVEL =
-//             match (options.verbose, options.quiet) {
-//                 (true, _) => log::LogLevel::Verbose,
-//                 (false, true) => log::LogLevel::Quiet,
-//                 _ => log::LogLevel::Normal,
-//             };
-// }
-
 /// The command to run
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "cli", derive(clap::Parser))]
 pub enum Command {
-    /// Print submodule status
+    /// Print the status of the submodules in the current git repository.
     Status(StatusCommand),
     /// Add or install dependencies
     ///
@@ -177,7 +141,7 @@ impl Command {
     pub fn run(&self, dir: &str) -> Result<(), GitError> {
         match self {
             Command::Status(cmd) => {
-                cmd.run(dir);
+                cmd.run(dir)?;
             }
             _ => todo!(),
             // Command::Install(cmd) => cmd.run(dir),
@@ -203,12 +167,16 @@ pub struct StatusCommand {
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub all: bool,
 
-    /// Fix the submodules to be in a consistent state.
+    /// Fix the submodules to be in a consistent state. (CAUTION - you should never have to do this if you let magoo manage the submodules, be sure to read the details in `magoo status --help` before using!)
     ///
-    /// Will attempt to fix inconsistencies between .gitmodules, the index, and various
-    /// configurations.
+    /// If any submodule appears to be broken (likely due to changing
+    /// the git files manually), this will attempt to bring the submodule back
+    /// to a consistent state by de-initializing it.
     ///
-    /// It will NOT initialize submodules that are not initialized or update them.
+    /// USE WITH CAUTION - If the submodule state is so broken that there's not enough information
+    /// to fix it, it will be removed from existence.
+    /// This may delete local files and directories that look like submodules because they are referenced by git files.
+    ///
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub fix: bool,
 
@@ -222,6 +190,7 @@ impl StatusCommand {
     }
     pub fn run(&self, dir: &str) -> Result<Vec<Submodule>, GitError> {
         let context = GitContext::try_from(dir)?;
+        let _guard = context.lock()?;
         if self.git {
             context.print_version_info()?;
             return Ok(vec![]);
@@ -231,15 +200,6 @@ impl StatusCommand {
         let mut index = Vec::new();
 
         context.get_submodule_status(&mut status_map, &mut index, self.all)?;
-        if self.fix {
-            let names = status_map.keys().cloned().collect::<Vec<_>>();
-            for name in names {
-                let submodule = status_map.get_mut(&name).unwrap();
-                if let FixResult::Dirty = submodule.make_module_consistent(&context)? {
-                    context.get_submodule_status(&mut status_map, &mut index, self.all)?;
-                }
-            }
-        }
 
         let mut status = status_map.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
         if self.all {
@@ -252,6 +212,17 @@ impl StatusCommand {
                 })
             });
         }
+        if self.fix {
+            for submodule in &mut status {
+                submodule.fix(&context)?;
+            }
+            return Ok(status);
+        }
+
+        if status.is_empty() {
+            println!("No submodules found");
+            return Ok(vec![]);
+        }
 
         let dir_switch = if dir == "." {
             "".to_string()
@@ -259,8 +230,10 @@ impl StatusCommand {
             format!(" --dir {dir}")
         };
 
+        let all_switch = if self.all { " --all" } else { "" };
+
         for submodule in &status {
-            submodule.print(&context, &dir_switch)?;
+            submodule.print(&context, &dir_switch, all_switch)?;
         }
         Ok(status)
     }

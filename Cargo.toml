@@ -1,6 +1,6 @@
 [package]
 name = "magoo"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 description = "A wrapper for git submodule that simplifies the workflows"
 repository = "https://github.com/Pistonite/magoo"
@@ -16,6 +16,7 @@ exclude = [
 
 [dependencies]
 clap = { version = "4.4.8", features = ["derive"], optional = true }
+fs4 = "0.7.0"
 pathdiff = "0.2.1"
 termcolor = "1.4.0"
 termsize = "0.1.6"
