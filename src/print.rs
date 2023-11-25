@@ -1,9 +1,9 @@
 //! Printing utilities
 
-use std::io::{IsTerminal, Write};
+use std::io::IsTerminal;
 use std::process::Command;
 
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream};
 
 static mut VERBOSE: bool = false;
 static mut QUIET: bool = true;
@@ -66,7 +66,7 @@ pub fn warn_color() -> ColorSpec {
     x
 }
 
-pub fn progress_color() -> ColorSpec {
+pub fn hint_color() -> ColorSpec {
     let mut x = ColorSpec::new();
     x.set_fg(Some(Color::Yellow)).set_intense(true);
     x
@@ -158,75 +158,37 @@ macro_rules! print_error {
 #[allow(unused)]
 pub(crate) use print_error;
 
-/// Print process
-macro_rules! print_progress {
-    ($($args:tt)*) => {
-        if !$crate::print::is_quiet() {
-            use std::io::{Write, IsTerminal};
-            use termcolor::WriteColor;
-            if std::io::stdout().is_terminal() {
-                let mut stdout = $crate::print::stdout();
-                let _ = stdout.set_color(&$crate::print::progress_color());
-                if let Some(cols) = termsize::get().map(|size| size.cols as usize) {
-                    let _ = write!(&mut stdout, "{:width$}\r", "", width = cols - 1);
-                }
-                let _ = write!(&mut stdout, $($args)*);
-                let _ = write!(&mut stdout, "\r");
-                let _ = std::io::stdout().flush();
-            } else {
-                println!($($args)*);
-            }
-        }
-    };
-}
-pub(crate) use print_progress;
-
-/// Clear the progress line and reset the color
-pub fn progress_done() {
-    if is_quiet() {
-        return;
-    }
-    if std::io::stdout().is_terminal() {
-        let mut stdout = stdout();
-        let _ = stdout.reset();
-        if let Some(cols) = termsize::get().map(|size| size.cols as usize) {
-            print!("{:width$}\r", "", width = cols - 1);
-        }
-        let _ = std::io::stdout().flush();
-    }
-}
-
-/// Print using dimmed color
-macro_rules! println_dimmed {
+/// Print using hint color
+macro_rules! println_hint {
     ($($args:tt)*) => {
         if !$crate::print::is_quiet() {
             use std::io::Write;
             use termcolor::WriteColor;
             let mut stdout = $crate::print::stdout();
-            let _ = stdout.set_color(&$crate::print::verbose_color());
+            let _ = stdout.set_color(&$crate::print::hint_color());
             let _ = writeln!(&mut stdout, $($args)*);
             let _ = stdout.reset();
         }
     };
 }
-pub(crate) use println_dimmed;
+pub(crate) use println_hint;
 
-/// Print using dimmed color without a new line
+/// Print using hint color without a new line
 #[allow(unused_macros)]
-macro_rules! print_dimmed {
+macro_rules! print_hint {
     ($($args:tt)*) => {
         if !$crate::print::is_quiet() {
             use std::io::Write;
             use termcolor::WriteColor;
             let mut stdout = $crate::print::stdout();
-            let _ = stdout.set_color(&$crate::print::verbose_color());
+            let _ = stdout.set_color(&$crate::print::hint_color());
             let _ = write!(&mut stdout, $($args)*);
             let _ = stdout.reset();
         }
     };
 }
 #[allow(unused)]
-pub(crate) use print_dimmed;
+pub(crate) use print_hint;
 
 /// Print message if verbose is true
 macro_rules! println_verbose {

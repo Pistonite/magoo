@@ -19,7 +19,6 @@ clap = { version = "4.4.8", features = ["derive"], optional = true }
 fs4 = "0.7.0"
 pathdiff = "0.2.1"
 termcolor = "1.4.0"
-termsize = "0.1.6"
 thiserror = "1.0.50"
 which = "5.0.0"
 

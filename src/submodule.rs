@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError};
-use crate::print::{println_dimmed, println_error, println_info, println_verbose, println_warn};
+use crate::print::{println_error, println_hint, println_info, println_verbose, println_warn};
 
 /// Collection of data of a submodule with the same name as identifier
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -59,16 +59,6 @@ impl Submodule {
         None
     }
 
-    /// Get the paths stored in different places are consistent
-    pub fn are_paths_consistent(&self) -> bool {
-        todo!()
-    }
-
-    // /// Return the path stored in .gitmodules
-    // pub fn simple_path(&self) -> Option<&str> {
-    //     self.in_gitmodules?.path.as_ref().map(|s| s.as_str())
-    // }
-
     /// Get the URL of the submodule with the best effort.
     ///
     /// Follows the order:
@@ -76,9 +66,7 @@ impl Submodule {
     /// 2. URL in .gitmodules
     pub fn url(&self) -> Option<&str> {
         if let Some(config) = &self.in_config {
-            if let Some(url) = &config.url {
-                return Some(url.as_str());
-            }
+            return Some(config.url.as_str());
         }
         if let Some(gitmodules) = &self.in_gitmodules {
             if let Some(url) = &gitmodules.url {
@@ -185,7 +173,7 @@ impl Submodule {
                         }
                     }
                     println_warn!("! checked out {head_commit_short}{describe}");
-                    println_dimmed!(
+                    println_hint!(
                         "    run `magoo{dir_switch} install` to revert all submodules to index"
                     );
                     if let Some(path) = path {
@@ -195,8 +183,8 @@ impl Submodule {
                             None => "git".to_string(),
                         };
 
-                        println_dimmed!("    run `{git_c} submodule update --init -- {path}` to revert this submodule to index");
-                        println_dimmed!("    run `{git_c} add {path}` update the index to {head_commit_short}{describe}");
+                        println_hint!("    run `{git_c} submodule update --init -- {path}` to revert this submodule to index");
+                        println_hint!("    run `{git_c} add {path}` update the index to {head_commit_short}{describe}");
                     }
                 }
             }
@@ -210,27 +198,27 @@ impl Submodule {
                     None => "git".to_string(),
                 };
 
-                println_dimmed!("    run `magoo{dir_switch} install` initialize all submodules");
-                println_dimmed!("    run `{git_c} submodule update --init -- {path}` to initialize only this submodule");
+                println_hint!("    run `magoo{dir_switch} install` to initialize all submodules");
+                println_hint!("    run `{git_c} submodule update --init -- {path}` to initialize only this submodule");
             }
         }
 
         if !self.is_module_consistent(context)? {
             println_error!("! submodule has residue");
-            println_dimmed!(
+            println_hint!(
                 "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
             );
         }
         if !self.resolved_paths(context)?.is_consistent() {
             println_error!("! inconsistent paths");
-            println_dimmed!(
+            println_hint!(
                 "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
             );
         }
         let issue = self.find_issue();
         if issue != PartsIssue::None {
             println_error!("! inconsistent state ({})", issue.describe());
-            println_dimmed!(
+            println_hint!(
                 "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
             );
         }
@@ -240,7 +228,7 @@ impl Submodule {
     }
 
     /// Return false if the submodule has issues that can be fixed with [`fix`]
-    pub fn is_healty(&self, context: &GitContext) -> Result<bool, GitError> {
+    pub fn is_healthy(&self, context: &GitContext) -> Result<bool, GitError> {
         if !self.is_module_consistent(context)? {
             return Ok(false);
         }
@@ -420,7 +408,7 @@ impl Submodule {
     }
 
     /// Deinitialize the submodule by removing the worktree and the git dir, and in .git/config
-    pub fn deinit(&mut self, context: &GitContext) -> Result<(), GitError> {
+    pub fn deinit(&mut self, context: &GitContext, force: bool) -> Result<(), GitError> {
         let path = match &self.in_index {
             None => {
                 return Err(GitError::InvalidIndex(
@@ -429,7 +417,7 @@ impl Submodule {
             }
             Some(index) => &index.path,
         };
-        context.submodule_deinit(Some(path))?;
+        context.submodule_deinit(Some(path), force)?;
         self.force_remove_module_dir(context)
     }
 
@@ -541,16 +529,7 @@ pub struct InGitConfig {
     /// Name of the submodule, stored in the section name
     pub name: String,
     /// URL of the submodule, stored as `submodule.<name>.url`
-    pub url: Option<String>,
-}
-
-impl InGitConfig {
-    pub fn with_name(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            ..Default::default()
-        }
-    }
+    pub url: String,
 }
 
 /// Data of submodule stored in .git/modules
@@ -623,7 +602,7 @@ impl PartsIssue {
     pub fn describe(&self) -> &'static str {
         match self {
             PartsIssue::None => "none",
-            PartsIssue::Residue => "eesidue",
+            PartsIssue::Residue => "residue",
             PartsIssue::MissingIndex => "index missing",
             PartsIssue::MissingInGitModules => "not in .gitmodules",
         }

@@ -5,7 +5,7 @@
 ![License Badge](https://img.shields.io/github/license/Pistonite/magoo)
 ![Issue Badge](https://img.shields.io/github/issues/Pistonite/magoo)
 
-**In Development. commands left are: install, update, remove**
+**In Development. commands left are: update, remove**
 
 This ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) is Magoo, he helps you manage git submodules with ease, like `npm` or `cargo`, but for submodules.
 
@@ -45,15 +45,23 @@ the officially supported `git` versions. Unsupported versions might work as well
 
 
 ### Add a submodule
-To add a submodule, ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) needs to know:
-- `URL`: The git URL like https://github.com/owner/repo
-- `PATH`: The path in your repo the module should be at
-- Optionally, `BRANCH`: The branch to update to when you run `magoo update`
+
+The argument for adding a submodule is very similar to [`git submodule add`](https://git-scm.com/docs/git-submodule#Documentation/git-submodule.txt-add-bltbranchgt-f--force--nameltnamegt--referenceltrepositorygt--depthltdepthgt--ltrepositorygtltpathgt)
+
+![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) needs to know the following to add a submodule.:
+
+|Arg|Description|Default|
+|-|-|-|
+|`URL`| The git URL like `https://github.com/owner/repo`. | URL is Required |
+|`PATH`| The path in your repo the module should be at | Directory at the top level with the same name as the submodule repo|
+|`BRANCH`| The branch to update to when you run `magoo update` | None (`HEAD`) |
+|`NAME`| Name to identify the submodule for other commands | same as `PATH` |
 
 It's recommended to always specify the `BRANCH`. Git by default will use the `HEAD` branch, which
 is usually not what you want.
 
 ```bash
+magoo install URL --branch BRANCH
 magoo install URL PATH --branch BRANCH
 magoo install URL PATH --branch BRANCH --name NAME --depth DEPTH --force
 ```
@@ -64,19 +72,22 @@ Run `magoo install help` to see other options
 ```bash
 magoo install
 ```
-This will ensure the submodules are cloned/updated to the commit stored in the index.
-You should run `magoo install` every time you pull - similar to `npm install`. 
-It also deletes submodules that are deleted by others.
+![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) will ensure the submodules are cloned/updated to the commit stored in the index.
+You should run `magoo install` every time you pull the changes from others, in case they were updated.
+It also deletes submodules that are deleted by others (by running `status --fix --all`, see below).
 
 ### Show submodule status
 ```bash
-magoo status
-magoo status --fix
+magoo status [--all]
+magoo status --fix [--all]
 ```
 Shows everything ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) knows about submodules in the current repo.
 
-If you have tinkered with submodules yourself, ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) might not like the state since
-there could be inconsistencies. ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) will tell you what he doesn't like, and the `--fix` option will fix those.
+The `--fix` option will bring the submodule states back to a consistent state that ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) likes.
+The state could be inconsistent if the git files were changed manually or by running
+individual `git` commands, or by a remote change.
+
+The `--all` option can potentially find more residues.
 
 ### Update submodules
 

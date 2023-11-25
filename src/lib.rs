@@ -68,16 +68,16 @@
 //! reference.
 //!
 
-use std::collections::BTreeMap;
-
-// mod error;
 mod git;
 pub use git::SUPPORTED_GIT_VERSIONS;
 use git::{GitContext, GitError};
 
 mod print;
+mod status;
 mod submodule;
-use submodule::Submodule;
+use status::Status;
+
+use crate::print::println_verbose;
 
 /// The main entry point for the library
 #[derive(Debug, Clone, PartialEq)]
@@ -115,7 +115,7 @@ pub enum Command {
     ///
     /// Installs dependencies if no arguments are provided.
     /// Otherwise, adds the provided dependency as a git submodule.
-    Install(AddCommand),
+    Install(InstallCommand),
     /// Updates all dependencies or the specified dependency.
     ///
     /// Dependencies will be updated to the branch (specified when adding the dependency) from the
@@ -129,8 +129,8 @@ impl Command {
     pub fn set_print_options(&self) {
         match self {
             Command::Status(cmd) => cmd.set_print_options(),
+            Command::Install(cmd) => cmd.set_print_options(),
             _ => todo!(),
-            // Command::Install(cmd) => cmd.set_print_options(),
             // Command::Update(cmd) => cmd.set_print_options(),
             // Command::Remove(cmd) => cmd.set_print_options(),
         }
@@ -140,8 +140,10 @@ impl Command {
             Command::Status(cmd) => {
                 cmd.run(dir)?;
             }
+            Command::Install(cmd) => {
+                cmd.run(dir)?;
+            }
             _ => todo!(),
-            // Command::Install(cmd) => cmd.run(dir),
             // Command::Update(cmd) => cmd.run(dir),
             // Command::Remove(cmd) => cmd.run(dir),
         }
@@ -183,42 +185,27 @@ pub struct StatusCommand {
 
 impl StatusCommand {
     pub fn set_print_options(&self) {
-        print::set_options(self.options.verbose, self.options.quiet, None);
+        self.options.apply();
     }
-    pub fn run(&self, dir: &str) -> Result<Vec<Submodule>, GitError> {
+    pub fn run(&self, dir: &str) -> Result<Status, GitError> {
         let context = GitContext::try_from(dir)?;
         let _guard = context.lock()?;
         if self.git {
             context.print_version_info()?;
-            return Ok(vec![]);
+            return Ok(Status::default());
         }
 
-        let mut status_map = BTreeMap::new();
-        let mut index = Vec::new();
-
-        context.get_submodule_status(&mut status_map, &mut index, self.all)?;
-
-        let mut status = status_map.into_values().collect::<Vec<_>>();
-        if self.all {
-            index.into_iter().for_each(|v| {
-                status.push(Submodule {
-                    in_gitmodules: None,
-                    in_config: None,
-                    in_index: Some(v),
-                    in_modules: None,
-                })
-            });
+        let mut status = Status::read_from(&context, self.all)?;
+        let mut flat_status = status.flattened_mut();
+        if flat_status.is_empty() {
+            println!("No submodules found");
+            return Ok(status);
         }
         if self.fix {
-            for submodule in &mut status {
+            for submodule in flat_status.iter_mut() {
                 submodule.fix(&context)?;
             }
             return Ok(status);
-        }
-
-        if status.is_empty() {
-            println!("No submodules found");
-            return Ok(vec![]);
         }
 
         let dir_switch = if dir == "." {
@@ -229,7 +216,7 @@ impl StatusCommand {
 
         let all_switch = if self.all { " --all" } else { "" };
 
-        for submodule in &status {
+        for submodule in &flat_status {
             submodule.print(&context, &dir_switch, all_switch)?;
         }
         Ok(status)
@@ -268,15 +255,19 @@ impl PrintOptions {
 /// The `add` command
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "cli", derive(clap::Parser))]
-pub struct AddCommand {
+pub struct InstallCommand {
     /// URL of the git repository to add
     ///
-    /// See the `add` command of https://git-scm.com/docs/git-submodule for what formats are
+    /// See the `add` command of <https://git-scm.com/docs/git-submodule> for what formats are
     /// supported.
-    pub url: String,
+    pub url: Option<String>,
 
     /// Local path to clone the git submodule to
-    pub path: String,
+    ///
+    /// Unlike the path specified with `git submodule add`, this path should be relative from
+    /// the top level (root) of the git repository.
+    #[cfg_attr(feature = "cli", arg(requires("url")))]
+    pub path: Option<String>,
 
     /// Branch to checkout and track
     ///
@@ -284,24 +275,66 @@ pub struct AddCommand {
     /// If not specified, the behavior is the same as `git submodule add` without `--branch`
     /// (`HEAD` is used)
     #[cfg_attr(feature = "cli", clap(long, short))]
+    #[cfg_attr(feature = "cli", arg(requires("url")))]
     pub branch: Option<String>,
 
     /// Name of the submodule
     ///
     /// If not specified, the name of the submodule is the same as the path.
     #[cfg_attr(feature = "cli", clap(long))]
+    #[cfg_attr(feature = "cli", arg(requires("url")))]
     pub name: Option<String>,
 
     /// Depth to clone the submodule
     #[cfg_attr(feature = "cli", clap(long))]
+    #[cfg_attr(feature = "cli", arg(requires("url")))]
     pub depth: Option<usize>,
 
     /// Whether to force the submodule to be added
     ///
-    /// This is the same as the `--force` flag of `git submodule add`. The submodule will be
-    /// added even if one with the same name or path already existed.
+    /// This will pass the `--force` flag to `git submodule add` and `git submodule update`.
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub force: bool,
+
+    #[cfg_attr(feature = "cli", clap(flatten))]
+    pub options: PrintOptions,
+}
+
+impl InstallCommand {
+    pub fn set_print_options(&self) {
+        self.options.apply();
+    }
+    pub fn run(&self, dir: &str) -> Result<(), GitError> {
+        let context = GitContext::try_from(dir)?;
+        let _guard = context.lock()?;
+
+        let mut status = Status::read_from(&context, true)?;
+        for submodule in status.flattened_mut() {
+            submodule.fix(&context)?;
+        }
+
+        match &self.url {
+            Some(url) => {
+                println_verbose!("Adding submodule from url: {url}");
+                context.submodule_add(
+                    url,
+                    self.path.as_deref(),
+                    self.branch.as_deref(),
+                    self.name.as_deref(),
+                    self.depth.as_ref().copied(),
+                    self.force,
+                )?;
+            }
+            None => {
+                println_verbose!("Installing submodules");
+                context.submodule_init(None)?;
+                context.submodule_sync(None)?;
+                context.submodule_update(None, self.force)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// The `update` command
