@@ -90,24 +90,13 @@ impl Status {
     }
 
     /// Get the submodule status in the repository.
-    ///
-    /// If `all` is false, it will not include submodules that are only in the index and in
-    /// `.git/modules`
-    pub fn read_from(context: &GitContext, all: bool) -> Result<Self, GitError> {
+    pub fn read_from(context: &GitContext) -> Result<Self, GitError> {
         let mut status = Self::default();
         status.read_dot_gitmodules(context)?;
         status.read_dot_git_config(context)?;
         // read .git/modules
-        if all {
-            status.find_all_git_modules(context)?;
-        } else {
-            for (name, submodule) in status.modules.iter_mut() {
-                if let Ok(module) = Self::read_git_module(name, context) {
-                    submodule.in_modules = Some(module);
-                }
-            }
-        };
-        status.read_submodules_in_index(context, all)?;
+        status.find_all_git_modules(context)?;
+        status.read_submodules_in_index(context)?;
 
         Ok(status)
     }
@@ -337,11 +326,7 @@ impl Status {
     }
 
     /// Use `git ls-files` to list submodules stored in the index into self
-    fn read_submodules_in_index(
-        &mut self,
-        context: &GitContext,
-        all: bool,
-    ) -> Result<(), GitError> {
+    fn read_submodules_in_index(&mut self, context: &GitContext) -> Result<(), GitError> {
         let index_list = context.ls_files(&[r#"--format=%(objectmode) %(objectname) %(path)"#])?;
 
         let mut path_to_index_object = BTreeMap::new();
@@ -387,15 +372,13 @@ impl Status {
             }
         }
 
-        if all {
-            for index_obj in path_to_index_object.into_values() {
-                self.nameless.push(Submodule {
-                    in_gitmodules: None,
-                    in_config: None,
-                    in_index: Some(index_obj),
-                    in_modules: None,
-                });
-            }
+        for index_obj in path_to_index_object.into_values() {
+            self.nameless.push(Submodule {
+                in_gitmodules: None,
+                in_config: None,
+                in_index: Some(index_obj),
+                in_modules: None,
+            });
         }
         Ok(())
     }

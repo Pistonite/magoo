@@ -7,8 +7,6 @@ TXTPP#include magoo.txt
 ![License Badge](https://img.shields.io/github/license/Pistonite/magoo)
 ![Issue Badge](https://img.shields.io/github/issues/Pistonite/magoo)
 
-**In Development. commands left are: update, remove**
-
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 This MAGOO is Magoo, he helps you manage git submodules with ease, like `npm` or `cargo`, but for submodules.
@@ -106,7 +104,7 @@ It also deletes submodules that are deleted by others (by running `status --fix 
 
 ### Show submodule status
 ```bash
-magoo status [--long] [--all] [--fix]
+magoo status [--long] [--fix]
 ```
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
@@ -125,7 +123,7 @@ TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 
 MAGOO updates the submodule by fetching and checking out the latest updates from the remote, tracked by
-the `BRANCH` specified when you add it.
+the `BRANCH` specified when you added it.
 
 - Update all submodules to the latest
    ```bash
@@ -143,7 +141,7 @@ the `BRANCH` specified when you add it.
 ### Remove submodules
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
-MAGOO can remove a submodule with ease:
+MAGOO will remove every trace of a submodule with a single command:
 ```bash
 magoo remove NAME
 ```
@@ -151,4 +149,4 @@ magoo remove NAME
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 Note: Newer versions of git lets you delete a submodule with `git rm`. However, it doesn't delete the content in
-`.git/modules`. MAGOO deletes those.
+`.git/modules`. MAGOO deletes those as well.

@@ -23,7 +23,6 @@
 //!
 //! let command = magoo::StatusCommand {
 //!     git: true,
-//!     all: false,
 //!     fix: false,
 //!     long: false,
 //!     options: PrintOptions {
@@ -46,14 +45,13 @@
 //! // for assertion below only
 //! use magoo::{Command, StatusCommand, PrintOptions};
 //!
-//! let magoo = Magoo::try_parse_from(["magoo", "--dir", "my/repo", "status", "--all", "--verbose"]).unwrap();
+//! let magoo = Magoo::try_parse_from(["magoo", "--dir", "my/repo", "status", "--long", "--verbose"]).unwrap();
 //!
 //! assert_eq!(magoo, Magoo {
 //!     subcmd: Command::Status(StatusCommand {
 //!         git: false,
-//!         all: true,
 //!         fix: false,
-//!         long: false,
+//!         long: true,
 //!         options: PrintOptions {
 //!             verbose: true,
 //!             quiet: false,
@@ -136,8 +134,7 @@ impl Command {
             Command::Status(cmd) => cmd.set_print_options(),
             Command::Install(cmd) => cmd.set_print_options(),
             Command::Update(cmd) => cmd.set_print_options(),
-            _ => todo!(),
-            // Command::Remove(cmd) => cmd.set_print_options(),
+            Command::Remove(cmd) => cmd.set_print_options(),
         }
     }
 
@@ -153,8 +150,9 @@ impl Command {
             Command::Update(cmd) => {
                 cmd.run(dir)?;
             }
-            _ => todo!(),
-            // Command::Remove(cmd) => cmd.run(dir),
+            Command::Remove(cmd) => {
+                cmd.run(dir)?;
+            }
         }
 
         Ok(())
@@ -172,12 +170,6 @@ pub struct StatusCommand {
     /// Show more information in a longer format
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub long: bool,
-
-    /// Show every trace of submodules found.
-    ///
-    /// This includes modules found in `.git/modules`, but not in anywhere else.
-    #[cfg_attr(feature = "cli", clap(long, short))]
-    pub all: bool,
 
     /// Fix the submodules to be in a consistent state. (CAUTION - you should never have to do this if you let magoo manage the submodules, be sure to read the details in `magoo status --help` before using!)
     ///
@@ -212,7 +204,7 @@ impl StatusCommand {
             return Ok(Status::default());
         }
 
-        let mut status = Status::read_from(&context, self.all)?;
+        let mut status = Status::read_from(&context)?;
         let mut flat_status = status.flattened_mut();
         if flat_status.is_empty() {
             println!("No submodules found");
@@ -231,10 +223,8 @@ impl StatusCommand {
             format!(" --dir {dir}")
         };
 
-        let all_switch = if self.all { " --all" } else { "" };
-
         for submodule in &flat_status {
-            submodule.print(&context, &dir_switch, all_switch, self.long)?;
+            submodule.print(&context, &dir_switch, self.long)?;
         }
         Ok(status)
     }
@@ -300,7 +290,7 @@ impl InstallCommand {
         let context = GitContext::try_from(dir)?;
         let _guard = context.lock()?;
 
-        let mut status = Status::read_from(&context, true)?;
+        let mut status = Status::read_from(&context)?;
         for submodule in status.flattened_mut() {
             submodule.fix(&context)?;
         }
@@ -363,6 +353,7 @@ pub struct UpdateCommand {
     #[cfg_attr(feature = "cli", clap(long))]
     pub bypass: bool,
 
+    /// Print options
     #[cfg_attr(feature = "cli", clap(flatten))]
     pub options: PrintOptions,
 }
@@ -381,7 +372,7 @@ impl UpdateCommand {
         match &self.name {
             Some(name) => {
                 println_verbose!("Updating submodule: {name}");
-                let status = Status::read_from(&context, false)?;
+                let status = Status::read_from(&context)?;
                 let submodule = match status.modules.get(name) {
                     Some(submodule) => submodule,
                     None => {
@@ -393,7 +384,7 @@ impl UpdateCommand {
                                 if let Some(path) = submodule.path() {
                                     if path == name {
                                         println_hint!("  however, there is a submodule \"{other_name}\" with path \"{path}\"");
-                                        println_hint!("  if you meant this submodule, use `magoo update {other_name}`");
+                                        println_hint!("  if you meant to update this submodule, use `magoo update {other_name}`");
                                         break;
                                     }
                                 }
@@ -462,11 +453,94 @@ pub struct RemoveCommand {
     /// The name of the submodule to remove
     pub name: String,
 
-    /// Whether to force the submodule to be removed
-    ///
-    /// The submodule will be removed even if it has local changes. (`git submodule deinit -f`)
+    /// Force remove the submodule. Will delete any local changes to the submodule
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub force: bool,
+
+    /// Pass the `--force` flag to `git submobule deinit`
+    ///
+    /// Cannot be used together with `--force`, since `--force` skips de-initializing.
+    #[cfg_attr(feature = "cli", clap(long))]
+    #[cfg_attr(feature = "cli", arg(conflicts_with("force")))]
+    pub force_deinit: bool,
+
+    /// Print options
+    #[cfg_attr(feature = "cli", clap(flatten))]
+    pub options: PrintOptions,
+}
+
+impl RemoveCommand {
+    /// Apply the print options
+    pub fn set_print_options(&self) {
+        self.options.apply();
+    }
+
+    /// Run the command in the given directory
+    pub fn run(&self, dir: &str) -> Result<(), GitError> {
+        let context = GitContext::try_from(dir)?;
+        let _guard = context.lock()?;
+
+        let name = &self.name;
+
+        println_verbose!("Removing submodule: {name}");
+        let mut status = Status::read_from(&context)?;
+        let submodule = match status.modules.get_mut(name) {
+            Some(submodule) => submodule,
+            None => {
+                println_error!("Submodule `{name}` not found!");
+                // maybe user passed in path instead of name?
+                println_verbose!("Trying to search for a path matching `{name}`");
+                for submodule in status.flattened() {
+                    if let Some(other_name) = submodule.name() {
+                        if let Some(path) = submodule.path() {
+                            if path == name {
+                                println_hint!("  however, there is a submodule \"{other_name}\" with path \"{path}\"");
+                                println_hint!("  if you meant to remove this submodule, use `magoo remove {other_name}`");
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                return Err(GitError::NeedFix(false));
+            }
+        };
+
+        if self.force {
+            println_verbose!("Removing (force): {name}");
+            submodule.force_delete(&context)?;
+        } else {
+            let path = match submodule.path() {
+                Some(x) => x,
+                None => {
+                    println_error!("Submodule `{name}` does not have a path!");
+                    println_hint!("  run `magoo status` to investigate.");
+                    println_hint!("  if you are unsure of the problem, try hard removing the submodule with `magoo remove {name} --force`");
+                    return Err(GitError::NeedFix(false));
+                }
+            };
+            if let Err(e) = context.submodule_deinit(Some(path), self.force_deinit) {
+                println_error!("Failed to deinitialize submodule `{name}`: {e}");
+                println_hint!(
+                    "  try running with `--force-deinit` to force deinitialize the module"
+                );
+                println_hint!(
+                    "  alternatively, running with `--force` will remove the module anyway."
+                );
+                return Err(GitError::NeedFix(false));
+            }
+
+            submodule.force_remove_module_dir(&context)?;
+            submodule.force_remove_config(&context)?;
+            submodule.force_remove_from_dot_gitmodules(&context)?;
+            submodule.force_remove_from_index(&context)?;
+        }
+
+        println_info!();
+        println_info!("Submodules removed successfully.");
+        println_hint!("  run `git status` to check the changes");
+        Ok(())
+    }
 }
 
 /// Printing options for all commands

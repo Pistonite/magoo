@@ -97,6 +97,7 @@ impl Submodule {
         None
     }
 
+    /// Get the short version (8 digits) of the commit in the index
     pub fn index_commit_short(&self) -> Option<&str> {
         self.index_commit().map(|s| &s[..7])
     }
@@ -111,15 +112,16 @@ impl Submodule {
         None
     }
 
+    /// Get the short version (8 digits) of the commit currently checked out
     pub fn head_commit_short(&self) -> Option<&str> {
         self.head_commit().map(|s| &s[..7])
     }
 
+    /// Print status
     pub fn print(
         &self,
         context: &GitContext,
         dir_switch: &str,
-        all_switch: &str,
         long: bool,
     ) -> Result<(), GitError> {
         let name = match self.name() {
@@ -234,22 +236,16 @@ impl Submodule {
 
         if !self.is_module_consistent(context)? {
             println_error!("! submodule has residue");
-            println_hint!(
-                "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
-            );
+            println_hint!("    run `magoo{dir_switch} status --fix` to fix all submodules");
         }
         if !self.resolved_paths(context)?.is_consistent() {
             println_error!("! inconsistent paths");
-            println_hint!(
-                "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
-            );
+            println_hint!("    run `magoo{dir_switch} status --fix` to fix all submodules");
         }
         let issue = self.find_issue();
         if issue != PartsIssue::None {
             println_error!("! inconsistent state ({})", issue.describe());
-            println_hint!(
-                "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
-            );
+            println_hint!("    run `magoo{dir_switch} status --fix` to fix all submodules");
         }
 
         if long {
@@ -439,26 +435,21 @@ impl Submodule {
         }
     }
 
-    /// Deinitialize the submodule by removing the worktree and the git dir, and in .git/config
-    pub fn deinit(&mut self, context: &GitContext, force: bool) -> Result<(), GitError> {
-        let path = match &self.in_index {
-            None => {
-                return Err(GitError::InvalidIndex(
-                    "submodule can only be deinitialized if it is in the index".to_string(),
-                ));
-            }
-            Some(index) => &index.path,
-        };
-        context.submodule_deinit(Some(path), force)?;
-        self.force_remove_module_dir(context)
-    }
-
     /// Delete the submodule by removing the configuration and directories that reference it
     pub fn force_delete(&mut self, context: &GitContext) -> Result<(), GitError> {
         self.force_remove_from_index(context)?;
         self.force_remove_module_dir(context)?;
         self.force_remove_config(context)?;
+        self.force_remove_from_dot_gitmodules(context)?;
 
+        Ok(())
+    }
+
+    /// Delete the submodule section in .gitmodules
+    pub fn force_remove_from_dot_gitmodules(
+        &mut self,
+        context: &GitContext,
+    ) -> Result<(), GitError> {
         if let Some(in_gitmodules) = &self.in_gitmodules {
             let top_level_dir = context.top_level_dir()?;
             let name = &in_gitmodules.name;
@@ -467,16 +458,18 @@ impl Submodule {
                 top_level_dir.join(".gitmodules"),
                 &format!("submodule.{name}"),
             );
+            context.add(".gitmodules")?;
         }
         self.in_gitmodules = None;
-
         Ok(())
     }
 
+    /// Remove the submodule from index
     pub fn force_remove_from_index(&mut self, context: &GitContext) -> Result<(), GitError> {
         if let Some(in_index) = &self.in_index {
             println_info!("Deleting `{}` in index", in_index.path);
             context.remove_from_index(&in_index.path)?;
+            context.add(".gitmodules")?;
         }
         self.in_index = None;
         Ok(())
@@ -634,8 +627,8 @@ impl PartsIssue {
     pub fn describe(&self) -> &'static str {
         match self {
             PartsIssue::None => "none",
-            PartsIssue::Residue => "residue",
-            PartsIssue::MissingIndex => "index missing",
+            PartsIssue::Residue => "has residue from removal",
+            PartsIssue::MissingIndex => "missing in index",
             PartsIssue::MissingInGitModules => "not in .gitmodules",
         }
     }

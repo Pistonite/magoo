@@ -5,7 +5,7 @@
 ![License Badge](https://img.shields.io/github/license/Pistonite/magoo)
 ![Issue Badge](https://img.shields.io/github/issues/Pistonite/magoo)
 
-**In Development. commands left are: update, remove**
+**In Development. commands left are: remove**
 
 This ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) is Magoo, he helps you manage git submodules with ease, like `npm` or `cargo`, but for submodules.
 
@@ -78,7 +78,7 @@ It also deletes submodules that are deleted by others (by running `status --fix 
 
 ### Show submodule status
 ```bash
-magoo status [--long] [--all] [--fix]
+magoo status [--long] [--fix]
 ```
 Shows everything ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) knows about submodules in the current repo.
 
@@ -91,7 +91,7 @@ The `--all` option can potentially find more residues.
 ### Update submodules
 
 ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) updates the submodule by fetching and checking out the latest updates from the remote, tracked by
-the `BRANCH` specified when you add it.
+the `BRANCH` specified when you added it.
 
 - Update all submodules to the latest
    ```bash

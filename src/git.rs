@@ -345,6 +345,14 @@ impl GitContext {
         Ok(())
     }
 
+    /// Run `git add`
+    pub fn add(&self, path: &str) -> Result<(), GitError> {
+        let top_level_dir = self.top_level_dir()?.display().to_string();
+
+        self.run_git_command(&["-C", &top_level_dir, "add", path], false)?;
+        Ok(())
+    }
+
     /// Runs `git submodule deinit [-- <path>]`. Path should be from top level
     pub fn submodule_deinit(&self, path: Option<&str>, force: bool) -> Result<(), GitError> {
         let top_level_dir = self.top_level_dir()?.display().to_string();
