@@ -51,7 +51,11 @@ TXTPP#include magoo.txt
 ### MAGOO As a library
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
-To include MAGOO in your rust application, add it as a depedency. See https://docs.rs/magoo for more info.
+To add MAGOO as a dependency:
+```
+cargo add magoo
+```
+See https://docs.rs/magoo for more info.
 
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
@@ -60,15 +64,23 @@ TXTPP#include magoo.txt
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 MAGOO runs `git` commands using sub-processes, so you must have `git` installed on the system.
-You can run `magoo status --git` to check what version you have on your system, as well as
+To check the version info, run
+```
+magoo status --git
+```
+
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
-the officially supported `git` versions. Unsupported versions might work as well, MAGOO just doesn't know.
+Unsupported versions might work as well, MAGOO just doesn't know.
 
 
 ### Add a submodule
+```bash
+magoo install URL PATH
+```
+(`magoo install --help` to see a full list of options)
 
-The argument for adding a submodule is very similar to [`git submodule add`](https://git-scm.com/docs/git-submodule#Documentation/git-submodule.txt-add-bltbranchgt-f--force--nameltnamegt--referenceltrepositorygt--depthltdepthgt--ltrepositorygtltpathgt)
+The arguments for adding a submodule is very similar to [`git submodule add`](https://git-scm.com/docs/git-submodule#Documentation/git-submodule.txt-add-bltbranchgt-f--force--nameltnamegt--referenceltrepositorygt--depthltdepthgt--ltrepositorygtltpathgt)
 
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
@@ -76,7 +88,7 @@ MAGOO needs to know the following to add a submodule.:
 
 |Arg|Description|Default|
 |-|-|-|
-|`URL`| The git URL like `https://github.com/owner/repo`. | URL is Required |
+|`URL`| The git URL like `https://github.com/owner/repo`. SSH and relative URLs also work. See [`git submodule add`](https://git-scm.com/docs/git-submodule#Documentation/git-submodule.txt-add-bltbranchgt-f--force--nameltnamegt--referenceltrepositorygt--depthltdepthgt--ltrepositorygtltpathgt) for details | URL is required |
 |`PATH`| The path in your repo the module should be at | Directory at the top level with the same name as the submodule repo|
 |`BRANCH`| The branch to update to when you run `magoo update` | None (`HEAD`) |
 |`NAME`| Name to identify the submodule for other commands | same as `PATH` |
@@ -84,15 +96,7 @@ MAGOO needs to know the following to add a submodule.:
 It's recommended to always specify the `BRANCH`. Git by default will use the `HEAD` branch, which
 is usually not what you want.
 
-```bash
-magoo install URL --branch BRANCH
-magoo install URL PATH --branch BRANCH
-magoo install URL PATH --branch BRANCH --name NAME --depth DEPTH --force
-```
-
-Run `magoo install help` to see other options
-
-### Initialize the submodules
+### Initialize/pull the submodules
 ```bash
 magoo install
 ```
@@ -100,7 +104,7 @@ TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 MAGOO will ensure the submodules are cloned/updated to the commit stored in the index.
 You should run `magoo install` every time you pull the changes from others, in case they were updated.
-It also deletes submodules that are deleted by others (by running `status --fix --all`, see below).
+It also deletes submodules that are deleted by others (by running `status --fix`, see below).
 
 ### Show submodule status
 ```bash
@@ -108,7 +112,7 @@ magoo status [--long] [--fix]
 ```
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
-Shows everything MAGOO knows about submodules in the current repo.
+MAGOO will show you everything he knows about submodules in the current repo.
 
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
@@ -116,19 +120,20 @@ The `--fix` option will bring the submodule states back to a consistent state th
 The state could be inconsistent if the git files were changed manually or by running
 individual `git` commands, or by a remote change.
 
-The `--all` option can potentially find more residues.
-
-### Update submodules
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
+MAGOO will fix the state by either de-initializing the submodule (if possible), or delete the submodule.
 
-MAGOO updates the submodule by fetching and checking out the latest updates from the remote, tracked by
-the `BRANCH` specified when you added it.
+### Update submodules
+```bash
+magoo update
+```
+TXTPP#tag MAGOO
+TXTPP#include magoo.txt
+This tells MAGOO to update all submodules to be sync with the remote `BRANCH` (specified when submodule was added).
+See `magoo update --help` for more info.
 
-- Update all submodules to the latest
-   ```bash
-   magoo update
-   ```
+You can also:
 - Update one submodule to the latest
    ```bash
    magoo update NAME
@@ -139,12 +144,12 @@ the `BRANCH` specified when you added it.
    ```
 
 ### Remove submodules
-TXTPP#tag MAGOO
-TXTPP#include magoo.txt
-MAGOO will remove every trace of a submodule with a single command:
 ```bash
 magoo remove NAME
 ```
+TXTPP#tag MAGOO
+TXTPP#include magoo.txt
+MAGOO will remove every trace of the submodule, with this single command.
 
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
