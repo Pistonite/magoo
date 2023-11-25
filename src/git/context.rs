@@ -1,9 +1,9 @@
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use fs4::FileExt;
@@ -172,7 +172,7 @@ impl GitContext {
             }
         } else {
             for (name, submodule) in status_map.iter_mut() {
-                if let Some(module) = self.read_git_module(name).ok() {
+                if let Ok(module) = self.read_git_module(name) {
                     submodule.in_modules = Some(module);
                 }
             }
@@ -429,7 +429,7 @@ impl GitContext {
             }
             Some(worktree) => {
                 let path = module_dir.join(&worktree);
-                let sub_git = match Self::try_from(&path).ok() {
+                let sub_git = match Self::try_from(path).ok() {
                     Some(sub_git) => sub_git,
                     None => {
                         return Ok(InGitModule {

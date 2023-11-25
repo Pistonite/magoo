@@ -1,10 +1,7 @@
 //! Integration with git commands
 use std::borrow::Cow;
-use std::cell::OnceCell;
-use std::collections::BTreeMap;
-use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::ExitStatus;
 
 mod context;
 pub use context::*;

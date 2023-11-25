@@ -110,6 +110,7 @@ macro_rules! println_warn {
 pub(crate) use println_warn;
 
 /// Print using warning color without a newline
+#[allow(unused_macros)]
 macro_rules! print_warn {
     ($($args:tt)*) => {
         if !$crate::print::is_quiet() {
@@ -122,6 +123,7 @@ macro_rules! print_warn {
         }
     };
 }
+#[allow(unused)]
 pub(crate) use print_warn;
 
 /// Print using error color
@@ -140,6 +142,7 @@ macro_rules! println_error {
 pub(crate) use println_error;
 
 /// Print using error color without a newline
+#[allow(unused_macros)]
 macro_rules! print_error {
     ($($args:tt)*) => {
         if !$crate::print::is_quiet() {
@@ -152,6 +155,7 @@ macro_rules! print_error {
         }
     };
 }
+#[allow(unused)]
 pub(crate) use print_error;
 
 /// Print process
@@ -208,6 +212,7 @@ macro_rules! println_dimmed {
 pub(crate) use println_dimmed;
 
 /// Print using dimmed color without a new line
+#[allow(unused_macros)]
 macro_rules! print_dimmed {
     ($($args:tt)*) => {
         if !$crate::print::is_quiet() {
@@ -220,6 +225,7 @@ macro_rules! print_dimmed {
         }
     };
 }
+#[allow(unused)]
 pub(crate) use print_dimmed;
 
 /// Print message if verbose is true

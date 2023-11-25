@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError, PrintMode};
-use crate::print::{println_dimmed, println_info, println_verbose, println_warn};
+use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError};
+use crate::print::{println_dimmed, println_error, println_info, println_verbose, println_warn};
 
 /// Collection of data of a submodule with the same name as identifier
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -216,20 +216,20 @@ impl Submodule {
         }
 
         if !self.is_module_consistent(context)? {
-            println_warn!("! submodule has residue");
+            println_error!("! submodule has residue");
             println_dimmed!(
                 "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
             );
         }
         if !self.resolved_paths(context)?.is_consistent() {
-            println_warn!("! inconsistent paths");
+            println_error!("! inconsistent paths");
             println_dimmed!(
                 "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
             );
         }
         let issue = self.find_issue();
         if issue != PartsIssue::None {
-            println_warn!("! inconsistent state ({})", issue.describe());
+            println_error!("! inconsistent state ({})", issue.describe());
             println_dimmed!(
                 "    run `magoo{dir_switch} status --fix{all_switch}` to fix all submodules"
             );
@@ -260,7 +260,7 @@ impl Submodule {
             None => return Ok(true),
         };
 
-        Ok(in_module.is_consistent(context)?)
+        in_module.is_consistent(context)
     }
 
     /// Resolves the paths stored in various places and return them
@@ -333,11 +333,10 @@ impl Submodule {
             if let Some(in_index) = &self.in_index {
                 let index_path = in_index.path.clone();
                 // path exists in index
-                if self.in_modules.is_some() {
-                    if resolved_paths.in_index != resolved_paths.in_modules {
-                        // module has different path, delete it
-                        self.force_remove_module_dir(context)?;
-                    }
+                if self.in_modules.is_some() && resolved_paths.in_index != resolved_paths.in_modules
+                {
+                    // module has different path, delete it
+                    self.force_remove_module_dir(context)?;
                 }
                 if let Some(in_gitmodules) = &self.in_gitmodules {
                     if resolved_paths.in_index != resolved_paths.in_gitmodules {
@@ -457,7 +456,7 @@ impl Submodule {
     pub fn force_remove_from_index(&mut self, context: &GitContext) -> Result<(), GitError> {
         if let Some(in_index) = &self.in_index {
             println_info!("Deleting `{}` in index", in_index.path);
-            let _ = context.remove_from_index(&in_index.path)?;
+            context.remove_from_index(&in_index.path)?;
         }
         self.in_index = None;
         Ok(())

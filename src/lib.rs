@@ -21,57 +21,54 @@
 //! ```rust
 //! use magoo::{StatusCommand, PrintOptions};
 //!
-//! fn main() {
-//!     let command = magoo::StatusCommand {
-//!         git: true,
-//!         all: false,
-//!         fix: false,
-//!         options: PrintOptions {
-//!             verbose: false,
-//!             quiet: false,
-//!             color: None,
-//!         },
-//!     }
+//! let command = magoo::StatusCommand {
+//!     git: true,
+//!     all: false,
+//!     fix: false,
+//!     options: PrintOptions {
+//!         verbose: false,
+//!         quiet: false,
+//!         color: None,
+//!     },
+//! };
 //!
-//!     // don't need this if you don't need output to stdout
-//!     command.set_print_options();
-//!     // runs `magoo status --git` in the current directory
-//!     command.run(".").unwrap();
-//! }
+//! // don't need this if you don't need output to stdout
+//! command.set_print_options();
+//! // runs `magoo status --git` in the current directory
+//! command.run("."); //.unwrap();
 //! ```
 //! #### Use `clap` to parse arguments
 //! ```rust
 //! use magoo::Magoo;
+//! use clap::Parser;
 //!
 //! // for assertion below only
-//! use magoo::{Command, StatusCommand};
+//! use magoo::{Command, StatusCommand, PrintOptions};
 //!
-//! fn main() {
-//!     let magoo = Magoo::try_parse_from("magoo --dir my/repo status --all --verbose").unwrap();
+//! let magoo = Magoo::try_parse_from(["magoo", "--dir", "my/repo", "status", "--all", "--verbose"]).unwrap();
 //!
-//!     assert_eq!(magoo, Magoo {
-//!         subcmd: Command::Status(StatusCommand {
-//!             git: false,
-//!             all: true,
-//!             fix: false,
-//!             options: PrintOptions {
-//!                 verbose: true,
-//!                 quiet: false,
-//!                 color: None,
-//!             },
+//! assert_eq!(magoo, Magoo {
+//!     subcmd: Command::Status(StatusCommand {
+//!         git: false,
+//!         all: true,
+//!         fix: false,
+//!         options: PrintOptions {
+//!             verbose: true,
+//!             quiet: false,
+//!             color: None,
 //!         },
-//!         dir: "my/repo".to_string(),
-//!     });
+//!     }),
+//!     dir: "my/repo".to_string(),
+//! });
 //!
-//!     magoo.set_print_options();
-//!     magoo.run().unwrap();
-//! }
+//! magoo.set_print_options();
+//! magoo.run(); //.unwrap();
 //! ```
 //! You can also look at [main.rs](https://github.com/Pistonite/magoo/blob/master/src/main.rs) for
 //! reference.
 //!
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 // mod error;
 mod git;
@@ -201,7 +198,7 @@ impl StatusCommand {
 
         context.get_submodule_status(&mut status_map, &mut index, self.all)?;
 
-        let mut status = status_map.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
+        let mut status = status_map.into_values().collect::<Vec<_>>();
         if self.all {
             index.into_iter().for_each(|v| {
                 status.push(Submodule {
