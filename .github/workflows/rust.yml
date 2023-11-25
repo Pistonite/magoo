@@ -19,6 +19,9 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
+    - uses: baptiste0928/cargo-install@v2
+      with:
+        crate: txtpp
     - run: task check
     - run: cargo build --release
     - run: cargo test --release
