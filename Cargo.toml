@@ -11,7 +11,9 @@ categories = ["development-tools"]
 exclude = [
     ".github/**/*",
     "README.txtpp.md",
-    "Taskfile.yml"
+    "Taskfile.yml",
+    "magoo.txt",
+    "magoo.webp"
 ]
 
 [dependencies]
