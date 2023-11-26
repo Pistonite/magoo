@@ -121,12 +121,12 @@ impl GitContext {
                 } else {
                     let path = pathdiff::diff_paths(top_level_dir, &cwd)
                         .unwrap_or(top_level_dir.to_path_buf());
-                    let diff = path.display().to_string();
+                    let diff = path.to_cmd_arg();
                     Some(quote_arg(&diff).to_string())
                 }
             }
             Err(_) => {
-                let top_level = top_level_dir.display().to_string();
+                let top_level = top_level_dir.to_cmd_arg();
                 Some(quote_arg(&top_level).to_string())
             }
         };
@@ -212,7 +212,7 @@ impl GitContext {
 
     /// Run `git -C top_level ls-files ...`
     pub fn ls_files(&self, extra_args: &[&str]) -> Result<Vec<String>, GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "ls-files"];
         args.extend_from_slice(extra_args);
         self.run_git_command(&args, false)
@@ -238,7 +238,7 @@ impl GitContext {
     where
         S: AsRef<Path>,
     {
-        let config_path = config_path.as_ref().display().to_string();
+        let config_path = config_path.to_cmd_arg();
         let value = self
             .run_git_command(&["config", "-f", &config_path, "--get", key], false)?
             .into_iter()
@@ -257,7 +257,7 @@ impl GitContext {
     where
         S: AsRef<Path>,
     {
-        let config_path = config_path.as_ref().display().to_string();
+        let config_path = config_path.to_cmd_arg();
         let name_and_values = self.run_git_command(
             &["config", "-f", &config_path, "--get-regexp", regexp],
             false,
@@ -303,7 +303,7 @@ impl GitContext {
     where
         S: AsRef<Path>,
     {
-        let config_path = config_path.as_ref().display().to_string();
+        let config_path = config_path.to_cmd_arg();
         let mut args = vec!["config", "-f", &config_path];
         match value {
             Some(v) => {
@@ -326,7 +326,7 @@ impl GitContext {
     where
         S: AsRef<Path>,
     {
-        let config_path = config_path.as_ref().display().to_string();
+        let config_path = config_path.to_cmd_arg();
         self.run_git_command(
             &["config", "-f", &config_path, "--remove-section", section],
             false,
@@ -336,7 +336,7 @@ impl GitContext {
 
     /// Remove an object from the index and stage the change. The path should be relative from repo top level
     pub fn remove_from_index(&self, path: &str) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
 
         // ignore the error because the file might not be in the index
         let _ = self.run_git_command(&["-C", &top_level_dir, "rm", path], false);
@@ -347,7 +347,7 @@ impl GitContext {
 
     /// Run `git add`
     pub fn add(&self, path: &str) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
 
         self.run_git_command(&["-C", &top_level_dir, "add", path], false)?;
         Ok(())
@@ -355,7 +355,7 @@ impl GitContext {
 
     /// Runs `git submodule deinit [-- <path>]`. Path should be from top level
     pub fn submodule_deinit(&self, path: Option<&str>, force: bool) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "deinit"];
 
         if force {
@@ -375,7 +375,7 @@ impl GitContext {
 
     /// Runs `git submodule init [-- <path>]`. Path should be from top level
     pub fn submodule_init(&self, path: Option<&str>) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "init"];
 
         if let Some(path) = path {
@@ -389,7 +389,7 @@ impl GitContext {
 
     /// Runs `git submodule sync [-- <path>]`. Path should be from top level
     pub fn submodule_sync(&self, path: Option<&str>) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "sync"];
 
         if let Some(path) = path {
@@ -403,7 +403,7 @@ impl GitContext {
 
     /// Runs `git submodule set-branch`. Path should be from top level
     pub fn submodule_set_branch(&self, path: &str, branch: Option<&str>) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "set-branch"];
         match branch {
             Some(branch) => {
@@ -422,7 +422,7 @@ impl GitContext {
 
     /// Runs `git submodule set-url`. Path should be from top level
     pub fn submodule_set_url(&self, path: &str, url: &str) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         self.run_git_command(
             &[
                 "-C",
@@ -445,7 +445,7 @@ impl GitContext {
         force: bool,
         remote: bool,
     ) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "update"];
 
         if force {
@@ -475,7 +475,7 @@ impl GitContext {
         depth: Option<usize>,
         force: bool,
     ) -> Result<(), GitError> {
-        let top_level_dir = self.top_level_dir()?.display().to_string();
+        let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "add"];
         if force {
             args.push("--force");
@@ -517,7 +517,7 @@ impl Guard {
     {
         let path = path.as_ref();
         if path.exists() {
-            println_warn!("Waiting on file lock. If you are sure no other magoo processes are running, you can remove the lock file `{}`", path.display());
+            println_warn!("Waiting on file lock. If you are sure no other magoo processes are running, you can remove the lock file `{}`", path.to_cmd_arg());
         }
         while path.exists() {
             println_verbose!("Waiting for lock file...");
@@ -528,17 +528,17 @@ impl Guard {
             .write(true)
             .create(true)
             .open(path)
-            .map_err(|e| GitError::LockFailed(path.display().to_string(), e))?;
+            .map_err(|e| GitError::LockFailed(path.to_cmd_arg(), e))?;
         file.lock_exclusive()
-            .map_err(|e| GitError::LockFailed(path.display().to_string(), e))?;
-        println_verbose!("Acquired lock file `{}`", path.display());
+            .map_err(|e| GitError::LockFailed(path.to_cmd_arg(), e))?;
+        println_verbose!("Acquired lock file `{}`", path.to_cmd_arg());
         Ok(Self(file, path.to_path_buf()))
     }
 }
 
 impl Drop for Guard {
     fn drop(&mut self) {
-        let path = &self.1.display();
+        let path = &self.1.to_cmd_arg();
         println_verbose!("Releasing lock file `{path}`");
         if self.0.unlock().is_err() {
             println_verbose!("Failed to unlock file `{path}`");
@@ -599,6 +599,30 @@ where
         let s = self.as_ref();
         s.canonicalize()
             .map_err(|e| GitError::CanonicalizeFail(s.display().to_string(), e))
+    }
+}
+
+/// Helper trait to clean a path to be used as command line argument
+pub trait GitCmdPath {
+    fn to_cmd_arg(&self) -> String;
+}
+
+impl<S> GitCmdPath for S
+where
+    S: AsRef<Path>,
+{
+    #[cfg(not(windows))]
+    fn to_cmd_arg(&self) -> String {
+        self.as_ref().display().to_string()
+    }
+
+    #[cfg(windows)]
+    fn to_cmd_arg(&self) -> String {
+        let s = self.as_ref().display().to_string();
+        match s.strip_prefix(r"\\?\") {
+            Some(x) => x.to_string(),
+            None => s,
+        }
     }
 }
 
