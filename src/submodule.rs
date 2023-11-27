@@ -1,3 +1,5 @@
+//! Submodule data and operations
+
 use std::path::{Path, PathBuf};
 
 use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError, GitCmdPath};

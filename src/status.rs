@@ -1,3 +1,5 @@
+//! Logic for getting the status of submodules
+
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -5,7 +7,7 @@ use crate::git::{GitContext, GitError, GitCmdPath};
 use crate::print::println_verbose;
 use crate::submodule::*;
 
-/// Data returned from [`GitContext::submodule_status`]
+/// Status of all submodules in a repository
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Status {
     /// The submodule status map from name to [`Submodule`]
@@ -37,9 +39,6 @@ macro_rules! insert_with_name {
 
 impl Status {
     /// Return a flattened view of all the submodules
-    ///
-    /// If the status was created with the `--all` flag, it will also include the nameless
-    /// submodules
     pub fn flattened(&self) -> Vec<&Submodule> {
         let mut modules = self.modules.values().collect::<Vec<_>>();
         for index_obj in &self.nameless {
@@ -49,9 +48,6 @@ impl Status {
     }
 
     /// Return a flattened view of all the submodules
-    ///
-    /// If the status was created with the `--all` flag, it will also include the nameless
-    /// submodules
     pub fn flattened_mut(&mut self) -> Vec<&mut Submodule> {
         let mut modules = self.modules.values_mut().collect::<Vec<_>>();
         for index_obj in self.nameless.iter_mut() {
@@ -61,9 +57,6 @@ impl Status {
     }
 
     /// Flattens the submodules into a vector of [`Submodule`]
-    ///
-    /// If the status was created with the `--all` flag, it will also include the nameless
-    /// submodules
     pub fn into_flattened(self) -> Vec<Submodule> {
         let mut modules = self.modules.into_values().collect::<Vec<_>>();
         for index_obj in self.nameless {
@@ -80,6 +73,7 @@ impl Status {
             .collect()
     }
 
+    /// Check if all submodules are healthy
     pub fn is_healthy(&self, context: &GitContext) -> Result<bool, GitError> {
         for submodule in self.flattened() {
             if !submodule.is_healthy(context)? {
@@ -89,7 +83,7 @@ impl Status {
         Ok(true)
     }
 
-    /// Get the submodule status in the repository.
+    /// Factory function. Get the submodule status in the repository.
     pub fn read_from(context: &GitContext) -> Result<Self, GitError> {
         let mut status = Self::default();
         status.read_dot_gitmodules(context)?;
