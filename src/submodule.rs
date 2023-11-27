@@ -1,6 +1,8 @@
+//! Submodule data and operations
+
 use std::path::{Path, PathBuf};
 
-use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError};
+use crate::git::{quote_arg, GitCanonicalize, GitCmdPath, GitContext, GitError};
 use crate::print::{
     print_info, print_warn, println_error, println_hint, println_info, println_verbose,
     println_warn,
@@ -488,7 +490,7 @@ impl Submodule {
                     if worktree_path.exists() {
                         println_info!(
                             "Deleting the worktree of submodule `{name}` at `{}`",
-                            worktree_path.display().to_string()
+                            worktree_path.to_cmd_arg()
                         );
                         let _ = std::fs::remove_dir_all(worktree_path);
                     }

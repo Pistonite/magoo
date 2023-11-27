@@ -1,11 +1,13 @@
+//! Logic for getting the status of submodules
+
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::git::{GitContext, GitError};
+use crate::git::{GitCmdPath, GitContext, GitError};
 use crate::print::println_verbose;
 use crate::submodule::*;
 
-/// Data returned from [`GitContext::submodule_status`]
+/// Status of all submodules in a repository
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Status {
     /// The submodule status map from name to [`Submodule`]
@@ -37,9 +39,6 @@ macro_rules! insert_with_name {
 
 impl Status {
     /// Return a flattened view of all the submodules
-    ///
-    /// If the status was created with the `--all` flag, it will also include the nameless
-    /// submodules
     pub fn flattened(&self) -> Vec<&Submodule> {
         let mut modules = self.modules.values().collect::<Vec<_>>();
         for index_obj in &self.nameless {
@@ -49,9 +48,6 @@ impl Status {
     }
 
     /// Return a flattened view of all the submodules
-    ///
-    /// If the status was created with the `--all` flag, it will also include the nameless
-    /// submodules
     pub fn flattened_mut(&mut self) -> Vec<&mut Submodule> {
         let mut modules = self.modules.values_mut().collect::<Vec<_>>();
         for index_obj in self.nameless.iter_mut() {
@@ -61,9 +57,6 @@ impl Status {
     }
 
     /// Flattens the submodules into a vector of [`Submodule`]
-    ///
-    /// If the status was created with the `--all` flag, it will also include the nameless
-    /// submodules
     pub fn into_flattened(self) -> Vec<Submodule> {
         let mut modules = self.modules.into_values().collect::<Vec<_>>();
         for index_obj in self.nameless {
@@ -80,6 +73,7 @@ impl Status {
             .collect()
     }
 
+    /// Check if all submodules are healthy
     pub fn is_healthy(&self, context: &GitContext) -> Result<bool, GitError> {
         for submodule in self.flattened() {
             if !submodule.is_healthy(context)? {
@@ -89,7 +83,7 @@ impl Status {
         Ok(true)
     }
 
-    /// Get the submodule status in the repository.
+    /// Factory function. Get the submodule status in the repository.
     pub fn read_from(context: &GitContext) -> Result<Self, GitError> {
         let mut status = Self::default();
         status.read_dot_gitmodules(context)?;
@@ -107,7 +101,7 @@ impl Status {
         let dot_gitmodules_path = top_level_dir.join(".gitmodules");
 
         let config_entries =
-            Self::read_submodule_from_config(context, &dot_gitmodules_path.display().to_string())?;
+            Self::read_submodule_from_config(context, &dot_gitmodules_path.to_cmd_arg())?;
 
         for (key, value) in config_entries {
             let name = if let Some(name) = key.strip_suffix(".path") {
@@ -135,7 +129,7 @@ impl Status {
 
         let config_entries = match Self::read_submodule_from_config(
             context,
-            &dot_git_config_path.display().to_string(),
+            &dot_git_config_path.to_cmd_arg(),
         ) {
             Ok(entries) => entries,
             Err(e) => {
@@ -208,7 +202,7 @@ impl Status {
         name: Option<&str>,
         dir_path: &Path,
     ) {
-        println_verbose!("Scanning for git modules in `{}`", dir_path.display());
+        println_verbose!("Scanning for git modules in `{}`", dir_path.to_cmd_arg());
         let config_path = dir_path.join("config");
         if config_path.is_file() {
             if let Some(name) = name {
@@ -239,7 +233,7 @@ impl Status {
             // dir_path is not a module, recurse
             let dir = match dir_path.read_dir() {
                 Err(e) => {
-                    println_verbose!("Failed to read directory `{}`: {e}", dir_path.display());
+                    println_verbose!("Failed to read directory `{}`: {e}", dir_path.to_cmd_arg());
                     return;
                 }
                 Ok(dir) => dir,
@@ -249,7 +243,7 @@ impl Status {
                     Err(e) => {
                         println_verbose!(
                             "Failed to read directory entry in `{}`: {e}",
-                            dir_path.display()
+                            dir_path.to_cmd_arg()
                         );
                         continue;
                     }
