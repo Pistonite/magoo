@@ -6,8 +6,8 @@ description = "A wrapper for git submodule that simplifies the workflows"
 repository = "https://github.com/Pistonite/magoo"
 license = "MIT"
 authors = ["Pistonight <terrabyte100k@gmail.com>"]
-keywords = ["git", "tool", "submodule"]
-categories = ["development-tools"]
+keywords = ["cli", "git", "tool", "submodule"]
+categories = ["development-tools", "command-line-utilities"]
 exclude = [
     ".github/**/*",
     "README.txtpp.md",
