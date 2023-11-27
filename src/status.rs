@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::git::{GitContext, GitError, GitCmdPath};
+use crate::git::{GitCmdPath, GitContext, GitError};
 use crate::print::println_verbose;
 use crate::submodule::*;
 

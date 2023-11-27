@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::git::{quote_arg, GitCanonicalize, GitContext, GitError, GitCmdPath};
+use crate::git::{quote_arg, GitCanonicalize, GitCmdPath, GitContext, GitError};
 use crate::print::{
     print_info, print_warn, println_error, println_hint, println_info, println_verbose,
     println_warn,
