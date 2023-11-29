@@ -101,7 +101,8 @@ impl Status {
         let dot_gitmodules_path = top_level_dir.join(".gitmodules");
 
         let config_entries =
-            Self::read_submodule_from_config(context, &dot_gitmodules_path.to_cmd_arg())?;
+            Self::read_submodule_from_config(context, &dot_gitmodules_path.to_cmd_arg())
+                .unwrap_or_default();
 
         for (key, value) in config_entries {
             let name = if let Some(name) = key.strip_suffix(".path") {

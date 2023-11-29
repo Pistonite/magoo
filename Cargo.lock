@@ -157,7 +157,7 @@ checksum = "969488b55f8ac402214f3f5fd243ebb7206cf82de60d3172994707a4bcc2b829"
 
 [[package]]
 name = "magoo"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "fs4",
