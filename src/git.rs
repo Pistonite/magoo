@@ -14,7 +14,7 @@ use crate::print::{self, println_info, println_verbose, println_warn};
 /// The semver notation of the officially supported git versions
 ///
 /// The version is not checked at run time, since unsupported versions might work fine.
-pub const SUPPORTED_GIT_VERSIONS: &str = ">=2.35.0";
+pub const SUPPORTED_GIT_VERSIONS: &str = ">=2.43.0";
 
 /// Context for running git commands
 pub struct GitContext {
@@ -402,6 +402,8 @@ impl GitContext {
     }
 
     /// Runs `git submodule set-branch`. Path should be from top level
+    ///
+    /// Note: Pre git 2.43, there's a bug treating the argument as name instead of path.
     pub fn submodule_set_branch(&self, path: &str, branch: Option<&str>) -> Result<(), GitError> {
         let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "set-branch"];
@@ -420,7 +422,9 @@ impl GitContext {
         Ok(())
     }
 
-    /// Runs `git submodule set-url`. Path should be from top level
+    /// Runs `git submodule set-url`.
+    ///
+    /// Note: Pre git 2.43, there's a bug treating the argument as name instead of path.
     pub fn submodule_set_url(&self, path: &str, url: &str) -> Result<(), GitError> {
         let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         self.run_git_command(
