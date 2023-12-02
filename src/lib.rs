@@ -91,7 +91,7 @@ pub struct Magoo {
     #[clap(subcommand)]
     pub subcmd: Command,
     /// Set the working directory of commands. Useful if not running inside a git repository.
-    #[cfg_attr(feature = "cli", clap(long, default_value(".")))]
+    #[cfg_attr(feature = "cli", clap(long, short('C'), default_value(".")))]
     pub dir: String,
 }
 

@@ -49,6 +49,8 @@ magoo status --git
 
 Unsupported versions might work as well, ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) just doesn't know.
 
+**git <=2.42.0 doesn't work due to a bug in set-branch and set-url commands**
+
 
 ### Add a submodule
 ```bash

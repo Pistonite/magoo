@@ -73,6 +73,8 @@ TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 Unsupported versions might work as well, MAGOO just doesn't know.
 
+**git <=2.42.0 doesn't work due to a bug in set-branch and set-url commands**
+
 
 ### Add a submodule
 ```bash
