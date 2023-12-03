@@ -460,7 +460,8 @@ impl Submodule {
                 top_level_dir.join(".gitmodules"),
                 &format!("submodule.{name}"),
             );
-            context.add(".gitmodules")?;
+            // add may fail if .gitmodules doesn't exist
+            let _ = context.add(".gitmodules");
         }
         self.in_gitmodules = None;
         Ok(())
@@ -471,7 +472,8 @@ impl Submodule {
         if let Some(in_index) = &self.in_index {
             println_info!("Deleting `{}` in index", in_index.path);
             context.remove_from_index(&in_index.path)?;
-            context.add(".gitmodules")?;
+            // add may fail if .gitmodules doesn't exist
+            let _ = context.add(".gitmodules");
         }
         self.in_index = None;
         Ok(())
