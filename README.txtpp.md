@@ -98,6 +98,8 @@ MAGOO needs to know the following to add a submodule.:
 It's recommended to always specify the `BRANCH`. Git by default will use the `HEAD` branch, which
 is usually not what you want.
 
+The submodule will not be cloned recursively when adding. If you need, run `magoo install` after the `add` to clone the recursive submodules.
+
 ### Initialize/pull the submodules
 ```bash
 magoo install
@@ -107,6 +109,8 @@ TXTPP#include magoo.txt
 MAGOO will ensure the submodules are cloned/updated to the commit stored in the index.
 You should run `magoo install` every time you pull the changes from others, in case they were updated.
 It also deletes submodules that are deleted by others (by running `status --fix`, see below).
+
+By default, submodules are installed recursively, you can use `--no-recursive` to only install the ones specified by the top-level repo.
 
 ### Show submodule status
 ```bash

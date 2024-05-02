@@ -329,7 +329,7 @@ impl Submodule {
     /// 1. The submodule is healthy and initialized.
     /// 2. The submodule is healthy but not initialized.
     /// 3. The submodule is deleted.
-    pub fn fix(&mut self, context: &GitContext) -> Result<(), GitError> {
+    pub fn fix(&mut self, context: &GitContext, prefer_delete: bool) -> Result<(), GitError> {
         // the submodule can be in any shape or form
         // here are some notations:
         // - `G`: submodule data in .gitmodules is [`Some`]
@@ -371,11 +371,16 @@ impl Submodule {
             }
         }
 
-        self.fix_issue(self.find_issue(), context)?;
+        self.fix_issue(self.find_issue(), context, prefer_delete)?;
         Ok(())
     }
 
-    fn fix_issue(&mut self, issue: PartsIssue, context: &GitContext) -> Result<(), GitError> {
+    fn fix_issue(
+        &mut self,
+        issue: PartsIssue,
+        context: &GitContext,
+        prefer_delete: bool,
+    ) -> Result<(), GitError> {
         match issue {
             PartsIssue::None => {
                 // submodule is healthy
@@ -387,7 +392,31 @@ impl Submodule {
                 self.force_remove_module_dir(context)?;
             }
             PartsIssue::MissingIndex => {
-                // index is missing, delete it
+                // index is missing
+                // try installing it from the info in submodule
+                if !prefer_delete {
+                    if let Some(gitmodule) = &self.in_gitmodules {
+                        // url and path are required
+                        if let (Some(url), Some(path)) = (&gitmodule.url, &gitmodule.path) {
+                            println_verbose!("Fix: adding submodule from .gitmodules");
+                            let result = context.submodule_add(
+                                url.as_ref(),
+                                Some(path.as_ref()),
+                                gitmodule.branch.as_deref(),
+                                Some(gitmodule.name.as_ref()),
+                                None,
+                                false,
+                            );
+                            if let Err(e) = result {
+                                println_error!("Failed to add submodule as part of --fix: {e}");
+                                println_hint!("To delete it instead, add the `--delete` flag");
+                                return Err(e);
+                            }
+                            return Ok(());
+                        }
+                    }
+                }
+                // if we can't add from .gitmodules, delete it
                 println_verbose!("Fix: deleting submodule missing in index");
                 self.force_delete(context)?;
             }
@@ -395,6 +424,12 @@ impl Submodule {
                 // submodule is not in .gitmodules
                 // delete it
                 println_verbose!("Fix: deleting submodule missing in .gitmodules");
+                self.force_delete(context)?;
+            }
+            PartsIssue::MissingIndexAndGitModules => {
+                // submodule is not in .gitmodules
+                // delete it
+                println_verbose!("Fix: deleting submodule missing in index and .gitmodules");
                 self.force_delete(context)?;
             }
         };
@@ -426,9 +461,13 @@ impl Submodule {
                 PartsIssue::Residue
             }
             (Some(_), None, Some(_), Some(_)) => PartsIssue::Residue,
-            (_, _, _, None) => {
-                // index is missing
+            (Some(_), _, _, None) => {
+                // index is missing, but is in .gitmodules
                 PartsIssue::MissingIndex
+            }
+            (None, _, _, None) => {
+                // submodule is not in .gitmodules or index
+                PartsIssue::MissingIndexAndGitModules
             }
             (None, _, _, _) => {
                 // submodule is not in .gitmodules
@@ -626,6 +665,7 @@ enum PartsIssue {
     Residue,
     MissingIndex,
     MissingInGitModules,
+    MissingIndexAndGitModules,
 }
 impl PartsIssue {
     pub fn describe(&self) -> &'static str {
@@ -634,6 +674,7 @@ impl PartsIssue {
             PartsIssue::Residue => "has residue from removal",
             PartsIssue::MissingIndex => "missing in index",
             PartsIssue::MissingInGitModules => "not in .gitmodules",
+            PartsIssue::MissingIndexAndGitModules => "missing in index and .gitmodules",
         }
     }
 }

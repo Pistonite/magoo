@@ -184,6 +184,10 @@ pub struct StatusCommand {
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub fix: bool,
 
+    /// Prefers deleting the submodule instead of installing it when fixing
+    #[cfg_attr(feature = "cli", clap(long, requires("fix")))]
+    pub delete: bool,
+
     /// Print options
     #[cfg_attr(feature = "cli", clap(flatten))]
     pub options: PrintOptions,
@@ -212,7 +216,7 @@ impl StatusCommand {
         }
         if self.fix {
             for submodule in flat_status.iter_mut() {
-                submodule.fix(&context)?;
+                submodule.fix(&context, self.delete)?;
             }
             return Ok(status);
         }
@@ -274,6 +278,12 @@ pub struct InstallCommand {
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub force: bool,
 
+    /// Don't install submodules recursively, only top-level
+    ///
+    /// By default, submodules are installed recursively with `git submodule update --recursive`.
+    #[cfg_attr(feature = "cli", clap(long))]
+    pub no_recursive: bool,
+
     /// Print options
     #[cfg_attr(feature = "cli", clap(flatten))]
     pub options: PrintOptions,
@@ -292,7 +302,7 @@ impl InstallCommand {
 
         let mut status = Status::read_from(&context)?;
         for submodule in status.flattened_mut() {
-            submodule.fix(&context)?;
+            submodule.fix(&context, false)?;
         }
 
         match &self.url {
@@ -310,8 +320,8 @@ impl InstallCommand {
             None => {
                 println_verbose!("Installing submodules");
                 context.submodule_init(None)?;
-                context.submodule_sync(None)?;
-                context.submodule_update(None, self.force, false)?;
+                context.submodule_sync(None, !self.no_recursive)?;
+                context.submodule_update(None, self.force, false, !self.no_recursive)?;
             }
         }
 
@@ -400,9 +410,8 @@ impl UpdateCommand {
                         println_hint!("  run `magoo status` to investigate. Some issues might be fixable with `magoo status --fix`.");
                         println_hint!("  alternatively, use the `--bypass` flag to ignore and continue anyway.");
                         return Err(GitError::NeedFix(false));
-                    } else {
-                        println_warn!("Bypassing warnings from unhealthy submodule `{name}`");
                     }
+                    println_warn!("Bypassing warnings from unhealthy submodule `{name}`");
                 }
 
                 let path = match submodule.path() {
@@ -425,14 +434,14 @@ impl UpdateCommand {
                     context.submodule_set_url(path, url)?;
                 }
 
-                context.submodule_sync(Some(path))?;
-                context.submodule_update(Some(path), self.force, true)?;
+                context.submodule_sync(Some(path), false)?;
+                context.submodule_update(Some(path), self.force, true, false)?;
             }
             None => {
                 println_verbose!("Updating submodules");
                 context.submodule_init(None)?;
-                context.submodule_sync(None)?;
-                context.submodule_update(None, self.force, true)?;
+                context.submodule_sync(None, false)?;
+                context.submodule_update(None, self.force, true, false)?;
             }
         }
 

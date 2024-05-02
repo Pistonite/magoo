@@ -181,7 +181,7 @@ impl GitContext {
         if print::is_verbose() {
             if let Some(stderr) = child.stderr.take() {
                 let reader = BufReader::new(stderr);
-                for line in reader.lines().flatten() {
+                for line in reader.lines().map_while(Result::ok) {
                     println_verbose!("{line}");
                 }
             }
@@ -388,9 +388,13 @@ impl GitContext {
     }
 
     /// Runs `git submodule sync [-- <path>]`. Path should be from top level
-    pub fn submodule_sync(&self, path: Option<&str>) -> Result<(), GitError> {
+    pub fn submodule_sync(&self, path: Option<&str>, recursive: bool) -> Result<(), GitError> {
         let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "sync"];
+
+        if recursive {
+            args.push("--recursive");
+        }
 
         if let Some(path) = path {
             args.push("--");
@@ -448,6 +452,7 @@ impl GitContext {
         path: Option<&str>,
         force: bool,
         remote: bool,
+        recursive: bool,
     ) -> Result<(), GitError> {
         let top_level_dir = self.top_level_dir()?.to_cmd_arg();
         let mut args = vec!["-C", &top_level_dir, "submodule", "update"];
@@ -458,6 +463,11 @@ impl GitContext {
 
         if remote {
             args.push("--remote");
+        }
+
+        if recursive {
+            args.push("--init");
+            args.push("--recursive");
         }
 
         if let Some(path) = path {
@@ -531,6 +541,7 @@ impl Guard {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(path)
             .map_err(|e| GitError::LockFailed(path.to_cmd_arg(), e))?;
         file.lock_exclusive()
