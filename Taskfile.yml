@@ -14,3 +14,7 @@ tasks:
     - cargo fmt --all
     - txtpp README.md
 
+  test:
+    desc: Run tests
+    cmds:
+    - cargo test
