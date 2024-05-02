@@ -30,6 +30,7 @@
 //!         quiet: false,
 //!         color: None,
 //!     },
+//!     delete: false,
 //! };
 //!
 //! // don't need this if you don't need output to stdout
@@ -57,6 +58,7 @@
 //!             quiet: false,
 //!             color: None,
 //!         },
+//!         delete: false,
 //!     }),
 //!     dir: "my/repo".to_string(),
 //! });
