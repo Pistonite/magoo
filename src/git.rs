@@ -9,12 +9,10 @@ use std::time::Duration;
 
 use fs4::FileExt;
 
-use crate::print::{self, println_info, println_verbose, println_warn};
-
-/// The semver notation of the officially supported git versions
-///
-/// The version is not checked at run time, since unsupported versions might work fine.
-pub const SUPPORTED_GIT_VERSIONS: &str = ">=2.43.0";
+use crate::print::{
+    self, println_error, println_hint, println_info, println_verbose, println_warn,
+};
+use crate::version;
 
 /// Context for running git commands
 pub struct GitContext {
@@ -57,14 +55,31 @@ impl GitContext {
         Guard::new(lock_path)
     }
 
-    /// Print the supported git version info and current git version into
-    pub fn print_version_info(&self) -> Result<(), GitError> {
-        println_info!(
-            "The officially supported git versions are: {}",
-            super::SUPPORTED_GIT_VERSIONS
-        );
-        println_info!("Your `git --version` is:");
-        self.run_git_command(&["--version"], true)?;
+    /// Check if the version is supported. If print is true, it will print the info when the
+    /// version is supported. Otherwise only print if it's not supported
+    pub fn check_version(&self, print: bool) -> Result<(), GitError> {
+        let out = self.run_git_command(&["--version"], false)?.join("");
+        let version = version::parse_git_version(&out).ok_or_else(|| {
+            GitError::UnsupportedVersion("nnable to parse git version".to_string())
+        })?;
+        if !version::is_supported(&version) {
+            println_error!("Magoo does not support your git version!");
+            println_error!("Your version is: {}", version);
+            println_hint!(
+                "Supported versions are: {}",
+                version::get_supported_versions()
+            );
+            println_hint!("Please upgrade your git to a supported version or use `magoo --allow-unsupported COMMAND`");
+            return Err(GitError::UnsupportedVersion(version.to_string()));
+        }
+        if print {
+            println_info!("Magoo supports your git version.");
+            println_info!("Your version is: {}", version);
+            println_info!(
+                "Supported versions are: {}",
+                version::get_supported_versions()
+            );
+        }
         Ok(())
     }
 
@@ -599,6 +614,9 @@ pub enum GitError {
 
     #[error("fix the issues above and try again.")]
     NeedFix(bool /* should show fatal */),
+
+    #[error("unsupported git version: {0}")]
+    UnsupportedVersion(String),
 }
 
 /// Helper trait to canonicalize a path and return a [`GitError`] if failed

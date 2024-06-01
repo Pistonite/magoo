@@ -42,14 +42,17 @@ See https://docs.rs/magoo for more info.
 ## Use ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp)
 
 ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) runs `git` commands using sub-processes, so you must have `git` installed on the system.
-To check the version info, run
+By default, ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) checks if the `git` version is supported.
+To print what version is supported manually, run:
 ```
 magoo status --git
 ```
 
-Unsupported versions might work as well, ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) just doesn't know.
-
-**git <=2.42.0 doesn't work due to a bug in set-branch and set-url commands**
+Unsupported versions might work as well, you can let ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) know with the `--allow-unsupported` flag (note
+it needs to be before the subcommand)
+```
+magoo --allow-unsupported status
+```
 
 
 ### Add a submodule

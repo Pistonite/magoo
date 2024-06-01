@@ -64,16 +64,21 @@ TXTPP#include magoo.txt
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
 MAGOO runs `git` commands using sub-processes, so you must have `git` installed on the system.
-To check the version info, run
+TXTPP#tag MAGOO
+TXTPP#include magoo.txt
+By default, MAGOO checks if the `git` version is supported.
+To print what version is supported manually, run:
 ```
 magoo status --git
 ```
 
 TXTPP#tag MAGOO
 TXTPP#include magoo.txt
-Unsupported versions might work as well, MAGOO just doesn't know.
-
-**git <=2.42.0 doesn't work due to a bug in set-branch and set-url commands**
+Unsupported versions might work as well, you can let MAGOO know with the `--allow-unsupported` flag (note
+it needs to be before the subcommand)
+```
+magoo --allow-unsupported status
+```
 
 
 ### Add a submodule
