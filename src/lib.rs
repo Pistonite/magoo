@@ -408,8 +408,12 @@ impl UpdateCommand {
                             if let Some(other_name) = submodule.name() {
                                 if let Some(path) = submodule.path() {
                                     if path == name {
-                                        println_hint!("  however, there is a submodule \"{other_name}\" with path \"{path}\"");
-                                        println_hint!("  if you meant to update this submodule, use `magoo update {other_name}`");
+                                        println_hint!(
+                                            "  however, there is a submodule \"{other_name}\" with path \"{path}\""
+                                        );
+                                        println_hint!(
+                                            "  if you meant to update this submodule, use `magoo update {other_name}`"
+                                        );
                                         break;
                                     }
                                 }
@@ -422,8 +426,12 @@ impl UpdateCommand {
                 if !submodule.is_healthy(&context)? {
                     if !self.bypass {
                         println_error!("Submodule `{name}` is not healthy!");
-                        println_hint!("  run `magoo status` to investigate. Some issues might be fixable with `magoo status --fix`.");
-                        println_hint!("  alternatively, use the `--bypass` flag to ignore and continue anyway.");
+                        println_hint!(
+                            "  run `magoo status` to investigate. Some issues might be fixable with `magoo status --fix`."
+                        );
+                        println_hint!(
+                            "  alternatively, use the `--bypass` flag to ignore and continue anyway."
+                        );
                         return Err(GitError::NeedFix(false));
                     }
                     println_warn!("Bypassing warnings from unhealthy submodule `{name}`");
@@ -434,7 +442,9 @@ impl UpdateCommand {
                     None => {
                         println_error!("Submodule `{name}` does not have a path!");
                         println_hint!("  run `magoo status` to investigate.");
-                        println_hint!("  if you are unsure of the problem, try hard removing the submodule with `magoo remove {name} --force` and then re-adding it");
+                        println_hint!(
+                            "  if you are unsure of the problem, try hard removing the submodule with `magoo remove {name} --force` and then re-adding it"
+                        );
                         return Err(GitError::NeedFix(false));
                     }
                 };
@@ -521,8 +531,12 @@ impl RemoveCommand {
                     if let Some(other_name) = submodule.name() {
                         if let Some(path) = submodule.path() {
                             if path == name {
-                                println_hint!("  however, there is a submodule \"{other_name}\" with path \"{path}\"");
-                                println_hint!("  if you meant to remove this submodule, use `magoo remove {other_name}`");
+                                println_hint!(
+                                    "  however, there is a submodule \"{other_name}\" with path \"{path}\""
+                                );
+                                println_hint!(
+                                    "  if you meant to remove this submodule, use `magoo remove {other_name}`"
+                                );
                                 break;
                             }
                         }
@@ -542,7 +556,9 @@ impl RemoveCommand {
                 None => {
                     println_error!("Submodule `{name}` does not have a path!");
                     println_hint!("  run `magoo status` to investigate.");
-                    println_hint!("  if you are unsure of the problem, try hard removing the submodule with `magoo remove {name} --force`");
+                    println_hint!(
+                        "  if you are unsure of the problem, try hard removing the submodule with `magoo remove {name} --force`"
+                    );
                     return Err(GitError::NeedFix(false));
                 }
             };

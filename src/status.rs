@@ -134,7 +134,9 @@ impl Status {
         ) {
             Ok(entries) => entries,
             Err(e) => {
-                println_verbose!("Git error when reading submodules from .git/config, assuming no submodules: {e}");
+                println_verbose!(
+                    "Git error when reading submodules from .git/config, assuming no submodules: {e}"
+                );
                 return Ok(());
             }
         };

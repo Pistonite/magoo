@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 use std::time::Duration;
 
-use fs4::FileExt;
+use fs4::fs_std::FileExt;
 
 use crate::print::{
     self, println_error, println_hint, println_info, println_verbose, println_warn,
@@ -69,7 +69,9 @@ impl GitContext {
                 "Supported versions are: {}",
                 version::get_supported_versions()
             );
-            println_hint!("Please upgrade your git to a supported version or use `magoo --allow-unsupported COMMAND`");
+            println_hint!(
+                "Please upgrade your git to a supported version or use `magoo --allow-unsupported COMMAND`"
+            );
             return Err(GitError::UnsupportedVersion(version.to_string()));
         }
         if print {
@@ -546,7 +548,10 @@ impl Guard {
     {
         let path = path.as_ref();
         if path.exists() {
-            println_warn!("Waiting on file lock. If you are sure no other magoo processes are running, you can remove the lock file `{}`", path.to_cmd_arg());
+            println_warn!(
+                "Waiting on file lock. If you are sure no other magoo processes are running, you can remove the lock file `{}`",
+                path.to_cmd_arg()
+            );
         }
         while path.exists() {
             println_verbose!("Waiting for lock file...");
@@ -570,7 +575,7 @@ impl Drop for Guard {
     fn drop(&mut self) {
         let path = &self.1.to_cmd_arg();
         println_verbose!("Releasing lock file `{path}`");
-        if self.0.unlock().is_err() {
+        if <File as FileExt>::unlock(&self.0).is_err() {
             println_verbose!("Failed to unlock file `{path}`");
         }
         if std::fs::remove_file(&self.1).is_err() {

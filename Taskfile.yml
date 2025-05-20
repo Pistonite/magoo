@@ -1,20 +1,33 @@
 version: '3'
 
+includes:
+  cargo:
+    taskfile: ./mono-dev/task/cargo.yaml
+    optional: true
+    internal: true
+
 tasks:
-  check:
-    desc: Check for issues
+  install-cargo-extra-tools:
+    aliases: [icets]
     cmds:
-    - cargo clippy --all-features --all-targets -- -D warnings -D clippy::todo
-    - cargo fmt --check
-    - txtpp verify README.md
+      - cargo install txtpp
+
+  install:
+    cmds:
+      - rm -rf mono-dev
+      - git clone https://github.com/Pistonight/mono-dev
+
+  check:
+    cmds:
+      - task: cargo:clippy-all
+      - task: cargo:fmt-check
+      - txtpp verify README.md
 
   fix:
-    desc: Run formatter
     cmds:
-    - cargo fmt --all
-    - txtpp README.md
+      - task: cargo:fmt-fix
+      - txtpp README.md
 
   test:
-    desc: Run tests
     cmds:
-    - cargo test
+      - cargo test

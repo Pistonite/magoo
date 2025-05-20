@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::git::{quote_arg, GitCanonicalize, GitCmdPath, GitContext, GitError};
+use crate::git::{GitCanonicalize, GitCmdPath, GitContext, GitError, quote_arg};
 use crate::print::{
     print_info, print_warn, println_error, println_hint, println_info, println_verbose,
     println_warn,
@@ -199,12 +199,16 @@ impl Submodule {
                                 None => "git".to_string(),
                             };
 
-                            println_hint!("    run `{git_c} submodule update -- {path}` to revert this submodule to index (`magoo{dir_switch} install` to revert all)");
-                            println_hint!("    run `{git_c} add {path}` update the index to {head_commit_short}{describe}");
+                            println_hint!(
+                                "    run `{git_c} submodule update -- {path}` to revert this submodule to index (`magoo{dir_switch} install` to revert all)"
+                            );
+                            println_hint!(
+                                "    run `{git_c} add {path}` update the index to {head_commit_short}{describe}"
+                            );
                         } else {
                             println_hint!(
-                            "    run `magoo{dir_switch} install` to revert all submodules to index"
-                        );
+                                "    run `magoo{dir_switch} install` to revert all submodules to index"
+                            );
                         }
                     } else {
                         print_warn!(", checked out {head_commit_short}{describe}");
@@ -225,7 +229,9 @@ impl Submodule {
                     println_hint!(
                         "    run `magoo{dir_switch} install` to initialize all submodules"
                     );
-                    println_hint!("    run `{git_c} submodule update --init -- {path}` to initialize only this submodule");
+                    println_hint!(
+                        "    run `{git_c} submodule update --init -- {path}` to initialize only this submodule"
+                    );
                 } else {
                     print_warn!(", not initialized");
                 }
