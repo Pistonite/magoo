@@ -1,8 +1,8 @@
 use std::process::exit;
 
 use clap::Parser;
-use magoo::git::GitError;
 use magoo::Magoo;
+use magoo::git::GitError;
 
 fn main() {
     let cli = Magoo::parse();

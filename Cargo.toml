@@ -1,11 +1,11 @@
 [package]
 name = "magoo"
-version = "0.2.1"
-edition = "2021"
+version = "0.2.2"
+edition = "2024"
 description = "A wrapper for git submodule that simplifies the workflows"
 repository = "https://github.com/Pistonite/magoo"
 license = "MIT"
-authors = ["Pistonight <terrabyte100k@gmail.com>"]
+authors = ["Pistonight <pistonknight@outlook.com>"]
 keywords = ["git", "tool", "submodule", "cli"]
 categories = ["development-tools", "command-line-utilities"]
 exclude = [
@@ -17,13 +17,13 @@ exclude = [
 ]
 
 [dependencies]
-clap = { version = "4.5.4", features = ["derive"], optional = true }
-fs4 = "0.8.2"
-pathdiff = "0.2.1"
-semver = "1.0.23"
+clap = { version = "4.5.38", features = ["derive"], optional = true }
+fs4 = "0.13.1"
+pathdiff = "0.2.3"
+semver = "1.0.26"
 termcolor = "1.4.1"
-thiserror = "1.0.59"
-which = "6.0.1"
+thiserror = "2.0.12"
+which = "7.0.3"
 
 [features]
 default = ["cli"]
