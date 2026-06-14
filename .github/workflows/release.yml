@@ -1,0 +1,21 @@
+name: Release
+on:
+  push:
+    tags:
+      - v*.*.*
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # permission for publish release
+    permissions:
+      contents: write
+    steps:
+      - uses: Pistonight/mono-dev/actions/release@main
+        with:
+          # optional: download artifacts from a previous workflow
+          artifacts-workflow: build.yml
+          artifacts-name: release
+          pack: magoo-*
+          # optional. if provided, release artifacts will be signed
+          minisign-key: ${{ secrets.MINISIGN_KEY }}

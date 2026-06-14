@@ -7,12 +7,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 use std::time::Duration;
 
-use fs4::fs_std::FileExt;
+use fs4::FileExt;
 
-use crate::print::{
-    self, println_error, println_hint, println_info, println_verbose, println_warn,
-};
-use crate::version;
+use crate::print::{self, println_info, println_verbose, println_warn};
 
 /// Context for running git commands
 pub struct GitContext {
@@ -53,36 +50,6 @@ impl GitContext {
         let git_dir = self.git_dir()?;
         let lock_path = git_dir.join("magoo.lock");
         Guard::new(lock_path)
-    }
-
-    /// Check if the version is supported. If print is true, it will print the info when the
-    /// version is supported. Otherwise only print if it's not supported
-    pub fn check_version(&self, print: bool) -> Result<(), GitError> {
-        let out = self.run_git_command(&["--version"], false)?.join("");
-        let version = version::parse_git_version(&out).ok_or_else(|| {
-            GitError::UnsupportedVersion("nnable to parse git version".to_string())
-        })?;
-        if !version::is_supported(&version) {
-            println_error!("Magoo does not support your git version!");
-            println_error!("Your version is: {}", version);
-            println_hint!(
-                "Supported versions are: {}",
-                version::get_supported_versions()
-            );
-            println_hint!(
-                "Please upgrade your git to a supported version or use `magoo --allow-unsupported COMMAND`"
-            );
-            return Err(GitError::UnsupportedVersion(version.to_string()));
-        }
-        if print {
-            println_info!("Magoo supports your git version.");
-            println_info!("Your version is: {}", version);
-            println_info!(
-                "Supported versions are: {}",
-                version::get_supported_versions()
-            );
-        }
-        Ok(())
     }
 
     /// Get the absolute path to the .git directory
@@ -564,7 +531,7 @@ impl Guard {
             .truncate(true)
             .open(path)
             .map_err(|e| GitError::LockFailed(path.to_cmd_arg(), e))?;
-        file.lock_exclusive()
+        file.lock()
             .map_err(|e| GitError::LockFailed(path.to_cmd_arg(), e))?;
         println_verbose!("Acquired lock file `{}`", path.to_cmd_arg());
         Ok(Self(file, path.to_path_buf()))

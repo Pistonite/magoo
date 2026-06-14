@@ -1,6 +1,6 @@
 # ![magoo](https://raw.githubusercontent.com/Pistonite/magoo/main/magoo.webp) magoo
 
-![Build Badge](https://img.shields.io/github/actions/workflow/status/Pistonite/magoo/rust.yml)
+![Build Badge](https://img.shields.io/github/actions/workflow/status/Pistonite/magoo/build.yml)
 ![Version Badge](https://img.shields.io/crates/v/magoo)
 ![License Badge](https://img.shields.io/github/license/Pistonite/magoo)
 ![Issue Badge](https://img.shields.io/github/issues/Pistonite/magoo)
