@@ -15,7 +15,7 @@ jobs:
         with:
           # optional: download artifacts from a previous workflow
           artifacts-workflow: build.yml
-          artifacts-name: release
+          artifacts-path: release
           pack: magoo-*
           # optional. if provided, release artifacts will be signed
           minisign-key: ${{ secrets.MINISIGN_KEY }}
