@@ -36,3 +36,8 @@ path = "src/lib.rs"
 name = "magoo"
 path = "src/main.rs"
 required-features = ["cli"]
+
+[package.metadata.binstall.signing]
+algorithm = "minisign"
+pubkey = "RWThJQKJaXayoZBe0YV5LV4KFkQwcqQ6Fg9dJBz18JnpHGdf/cHUyKs+"
+
