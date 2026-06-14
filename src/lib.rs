@@ -22,7 +22,6 @@
 //! use magoo::{StatusCommand, PrintOptions};
 //!
 //! let command = magoo::StatusCommand {
-//!     git: true,
 //!     fix: false,
 //!     long: false,
 //!     options: PrintOptions {
@@ -36,7 +35,7 @@
 //! // don't need this if you don't need output to stdout
 //! command.set_print_options();
 //! // runs `magoo status --git` in the current directory
-//! command.run(".", &Default::default()); //.unwrap();
+//! command.run("."); //.unwrap();
 //! ```
 //! #### Use `clap` to parse arguments
 //! ```rust
@@ -50,7 +49,6 @@
 //!
 //! assert_eq!(magoo, Magoo {
 //!     subcmd: Command::Status(StatusCommand {
-//!         git: false,
 //!         fix: false,
 //!         long: true,
 //!         options: PrintOptions {
@@ -61,7 +59,6 @@
 //!         delete: false,
 //!     }),
 //!     dir: "my/repo".to_string(),
-//!     common: Default::default(),
 //! });
 //!
 //! magoo.set_print_options();
