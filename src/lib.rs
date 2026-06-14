@@ -22,7 +22,6 @@
 //! use magoo::{StatusCommand, PrintOptions};
 //!
 //! let command = magoo::StatusCommand {
-//!     git: true,
 //!     fix: false,
 //!     long: false,
 //!     options: PrintOptions {
@@ -36,7 +35,7 @@
 //! // don't need this if you don't need output to stdout
 //! command.set_print_options();
 //! // runs `magoo status --git` in the current directory
-//! command.run(".", &Default::default()); //.unwrap();
+//! command.run("."); //.unwrap();
 //! ```
 //! #### Use `clap` to parse arguments
 //! ```rust
@@ -50,7 +49,6 @@
 //!
 //! assert_eq!(magoo, Magoo {
 //!     subcmd: Command::Status(StatusCommand {
-//!         git: false,
 //!         fix: false,
 //!         long: true,
 //!         options: PrintOptions {
@@ -61,7 +59,6 @@
 //!         delete: false,
 //!     }),
 //!     dir: "my/repo".to_string(),
-//!     common: Default::default(),
 //! });
 //!
 //! magoo.set_print_options();
@@ -77,7 +74,6 @@ use git::{GitContext, GitError};
 pub mod print;
 pub mod status;
 pub mod submodule;
-pub mod version;
 use status::Status;
 
 use crate::print::{println_error, println_hint, println_info, println_verbose, println_warn};
@@ -96,15 +92,12 @@ pub struct Magoo {
     /// Set the working directory of commands. Useful if not running inside a git repository.
     #[cfg_attr(feature = "cli", clap(long, short('C'), default_value(".")))]
     pub dir: String,
-
-    #[cfg_attr(feature = "cli", clap(flatten))]
-    pub common: OtherOptions,
 }
 
 impl Magoo {
     /// Run the command
     pub fn run(&self) -> Result<(), GitError> {
-        self.subcmd.run(&self.dir, &self.common)
+        self.subcmd.run(&self.dir)
     }
 
     /// Apply the print options
@@ -145,19 +138,19 @@ impl Command {
     }
 
     /// Run the command in the given directory.
-    pub fn run(&self, dir: &str, common: &OtherOptions) -> Result<(), GitError> {
+    pub fn run(&self, dir: &str) -> Result<(), GitError> {
         match self {
             Command::Status(cmd) => {
-                cmd.run(dir, common)?;
+                cmd.run(dir)?;
             }
             Command::Install(cmd) => {
-                cmd.run(dir, common)?;
+                cmd.run(dir)?;
             }
             Command::Update(cmd) => {
-                cmd.run(dir, common)?;
+                cmd.run(dir)?;
             }
             Command::Remove(cmd) => {
-                cmd.run(dir, common)?;
+                cmd.run(dir)?;
             }
         }
 
@@ -169,10 +162,6 @@ impl Command {
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "cli", derive(clap::Parser))]
 pub struct StatusCommand {
-    /// Show the current git version
-    #[cfg_attr(feature = "cli", clap(long))]
-    pub git: bool,
-
     /// Show more information in a longer format
     #[cfg_attr(feature = "cli", clap(long, short))]
     pub long: bool,
@@ -206,15 +195,8 @@ impl StatusCommand {
     }
 
     /// Run the command and return the status as a [`Status`] struct.
-    pub fn run(&self, dir: &str, common: &OtherOptions) -> Result<Status, GitError> {
+    pub fn run(&self, dir: &str) -> Result<Status, GitError> {
         let context = GitContext::try_from(dir)?;
-        if self.git {
-            context.check_version(true)?;
-            return Ok(Status::default());
-        }
-        if !common.allow_unsupported {
-            context.check_version(false)?;
-        }
         let _guard = context.lock()?;
 
         let mut status = Status::read_from(&context)?;
@@ -305,11 +287,8 @@ impl InstallCommand {
     }
 
     /// Run the command in the given directory
-    pub fn run(&self, dir: &str, common: &OtherOptions) -> Result<(), GitError> {
+    pub fn run(&self, dir: &str) -> Result<(), GitError> {
         let context = GitContext::try_from(dir)?;
-        if !common.allow_unsupported {
-            context.check_version(false)?;
-        }
         let _guard = context.lock()?;
 
         let mut status = Status::read_from(&context)?;
@@ -387,11 +366,8 @@ impl UpdateCommand {
     }
 
     /// Run the command in the given directory
-    pub fn run(&self, dir: &str, common: &OtherOptions) -> Result<(), GitError> {
+    pub fn run(&self, dir: &str) -> Result<(), GitError> {
         let context = GitContext::try_from(dir)?;
-        if !common.allow_unsupported {
-            context.check_version(false)?;
-        }
         let _guard = context.lock()?;
 
         match &self.name {
@@ -510,11 +486,8 @@ impl RemoveCommand {
     }
 
     /// Run the command in the given directory
-    pub fn run(&self, dir: &str, common: &OtherOptions) -> Result<(), GitError> {
+    pub fn run(&self, dir: &str) -> Result<(), GitError> {
         let context = GitContext::try_from(dir)?;
-        if !common.allow_unsupported {
-            context.check_version(false)?;
-        }
         let _guard = context.lock()?;
 
         let name = &self.name;
@@ -614,16 +587,4 @@ impl PrintOptions {
     pub fn apply(&self) {
         print::set_options(self.verbose, self.quiet, self.color);
     }
-}
-
-/// Other common options
-#[derive(Debug, Default, Clone, PartialEq)]
-#[cfg_attr(feature = "cli", derive(clap::Parser))]
-pub struct OtherOptions {
-    /// Allow unsupported git versions
-    ///
-    /// This could lead to unexpected behavior or make you vulnerable to security issues. Please
-    /// use with caution.
-    #[cfg_attr(feature = "cli", clap(long))]
-    pub allow_unsupported: bool,
 }

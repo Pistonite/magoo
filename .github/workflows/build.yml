@@ -1,0 +1,49 @@
+name: Build
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  check:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+          tool-mdbook: true
+          tool-cargo-install: txtpp
+      - run: task check
+      - run: task test
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: blacksmith-4vcpu-ubuntu-2404
+            target: x64
+          # - image: blacksmith-4vcpu-ubuntu-2404-arm
+          #   target: arm64
+          - image: blacksmith-6vcpu-macos-latest
+            target: arm64
+          - image: blacksmith-4vcpu-windows-2025
+            target: x64
+          # if needed: blacksmith currently doesn't have windows runners
+          # - image: windows-11-arm
+          #  target: arm64
+    runs-on: ${{ matrix.image }}
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+          rust-native: ${{ matrix.target }}
+      - uses: Pistonight/mono-dev/actions/rust-xplat@main
+        with:
+          arch: ${{ matrix.target }}
+          binary: magoo
+    
+

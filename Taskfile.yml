@@ -13,21 +13,30 @@ tasks:
       - cargo install txtpp
 
   install:
-    cmds:
-      - rm -rf mono-dev
-      - git clone https://github.com/Pistonight/mono-dev
+    - rm -rf mono-dev
+    - git clone https://github.com/Pistonight/mono-dev
 
   check:
-    cmds:
-      - task: cargo:clippy-all
-      - task: cargo:fmt-check
-      - txtpp verify README.md
+    - task: cargo:clippy-all
+    - task: cargo:fmt-check
+    - txtpp verify README.md
 
   fix:
-    cmds:
-      - task: cargo:fmt-fix
-      - txtpp README.md
+    - task: cargo:fmt-fix
+    - txtpp README.md
 
   test:
+    - cargo test
+
+  upgrade:
+    - cargo upgrade
+
+  publish:
+    vars:
+      VERSION:
+        sh: grep -E '^version' Cargo.toml | head -n1 | sed -E 's/^version = "([^"]+)"$/\1/'
     cmds:
-      - cargo test
+      - git tag v{{.VERSION}}
+      - git push origin v{{.VERSION}}
+      - cargo publish
+        
